@@ -1,0 +1,21 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+
+# Output folders
+bin/
+vendor/
+build/
+
+# Go modules (opsional kalau pakai vendoring)
+go.sum
+
+# Logs / debug / system
+*.log
+*.out
+.DS_Store
+.env

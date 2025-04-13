@@ -1,0 +1,24 @@
+# ====================================
+# Default EOL & Text Handling
+# ====================================
+* text=auto
+
+# Force Unix-style LF endings for Go code
+*.go     text eol=lf
+go.mod   text eol=lf
+go.sum   text eol=lf
+
+# Optional: JSON, YAML, Shell, Markdown
+*.json   text eol=lf
+*.yml    text eol=lf
+*.yaml   text eol=lf
+*.sh     text eol=lf
+*.md     text eol=lf
+
+# Binary files
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.ico    binary
+*.pdf    binary
