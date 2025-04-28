@@ -8,6 +8,7 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/winterheatherica/tokoaku-backend/config"
+	"github.com/winterheatherica/tokoaku-backend/internal/cache/volatile"
 	"github.com/winterheatherica/tokoaku-backend/internal/middleware"
 	"github.com/winterheatherica/tokoaku-backend/internal/routes"
 	"github.com/winterheatherica/tokoaku-backend/internal/seed"
@@ -30,6 +31,7 @@ func main() {
 	config.LoadAll()
 	services.InitAll()
 	seed.RunAllSeeders(database.DB)
+	volatile.StartVolatileCacheRefresher()
 
 	app := fiber.New()
 

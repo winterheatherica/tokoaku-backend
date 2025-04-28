@@ -34,7 +34,7 @@ func SendVerificationEmail(to string, token string) error {
 	payload := EmailPayload{
 		From:    config.Email.Sender,
 		To:      to,
-		Subject: "Verifikasi Email Tokoaku",
+		Subject: "Verifikasi Email " + config.App.PlatformName,
 		Html:    html,
 	}
 

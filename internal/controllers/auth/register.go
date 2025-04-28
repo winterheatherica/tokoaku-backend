@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"log"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/winterheatherica/tokoaku-backend/internal/services/database"
 	"github.com/winterheatherica/tokoaku-backend/internal/services/email"
 	"github.com/winterheatherica/tokoaku-backend/internal/services/redis"
+	"github.com/winterheatherica/tokoaku-backend/internal/utils"
 )
 
 func Register(c *fiber.Ctx) error {
@@ -31,8 +33,6 @@ func Register(c *fiber.Ctx) error {
 		})
 	}
 
-	log.Println("Cek apakah email sudah terdaftar...")
-
 	if body.Email == "" || body.Password == "" {
 		log.Println("Email atau password kosong")
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -40,8 +40,28 @@ func Register(c *fiber.Ctx) error {
 		})
 	}
 
+	ctx := context.Background()
+
+	prefix, err := utils.GetVolatileRedisPrefix()
+	if err != nil {
+		log.Println("Gagal ambil volatile prefix:", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Gagal inisialisasi cache",
+		})
+	}
+
+	redisClient, err := redis.GetRedisClient(prefix)
+	if err != nil {
+		log.Println("Gagal ambil Redis client:", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Gagal mengakses cache",
+		})
+	}
+
+	log.Println("Cek apakah email sudah terdaftar...")
+
 	var existingPending models.PendingUser
-	err := database.DB.First(&existingPending, "email = ?", body.Email).Error
+	err = database.DB.First(&existingPending, "email = ?", body.Email).Error
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		log.Println("Error saat cek pending_users:", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -50,7 +70,7 @@ func Register(c *fiber.Ctx) error {
 	}
 	if err == nil {
 		redisKey := "verify:" + body.Email
-		_, err := redis.Client.Get(redis.Ctx, redisKey).Result()
+		_, err := redisClient.Get(ctx, redisKey).Result()
 		if err == nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"message": "Email sudah digunakan dan menunggu verifikasi.",
@@ -60,7 +80,7 @@ func Register(c *fiber.Ctx) error {
 	}
 
 	cacheKey := "register-check:" + body.Email
-	cachedResult, _ := redis.Client.Get(redis.Ctx, cacheKey).Result()
+	cachedResult, _ := redisClient.Get(ctx, cacheKey).Result()
 	if cachedResult == "taken" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"message": "Email sudah terdaftar.",
@@ -69,7 +89,7 @@ func Register(c *fiber.Ctx) error {
 
 	var user models.User
 	if err := database.DB.First(&user, "email = ?", body.Email).Error; err == nil {
-		redis.Client.Set(redis.Ctx, cacheKey, "taken", 10*time.Minute)
+		_ = redisClient.Set(ctx, cacheKey, "taken", 10*time.Minute).Err()
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"message": "Email sudah terdaftar.",
 		})
@@ -86,7 +106,7 @@ func Register(c *fiber.Ctx) error {
 	log.Println("Password berhasil di-hash")
 
 	passKey := "plainpass:" + body.Email
-	err = redis.Client.Set(redis.Ctx, passKey, body.Password, 15*time.Minute).Err()
+	err = redisClient.Set(ctx, passKey, body.Password, 15*time.Minute).Err()
 	if err != nil {
 		log.Println("Gagal simpan password plaintext ke Redis:", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -111,7 +131,7 @@ func Register(c *fiber.Ctx) error {
 	token := uuid.NewString()
 	redisKey := "verify:" + body.Email
 
-	err = redis.Client.Set(redis.Ctx, redisKey, token, 15*time.Minute).Err()
+	err = redisClient.Set(ctx, redisKey, token, 15*time.Minute).Err()
 	if err != nil {
 		log.Println("Redis set token error:", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

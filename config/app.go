@@ -7,6 +7,7 @@ import (
 
 var App struct {
 	Port            string
+	PlatformName    string
 	Env             string
 	FrontendBaseURL string
 	BackendBaseURL  string
@@ -15,6 +16,7 @@ var App struct {
 
 func LoadAppConfig() {
 	App.Port = os.Getenv("PORT")
+	App.PlatformName = os.Getenv("PLATFORM_NAME")
 	App.Env = os.Getenv("APP_ENV")
 	App.FrontendBaseURL = os.Getenv("FRONTEND_BASE_URL")
 	App.BackendBaseURL = os.Getenv("BACKEND_BASE_URL")

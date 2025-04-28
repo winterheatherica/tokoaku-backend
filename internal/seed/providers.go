@@ -2,17 +2,18 @@ package seed
 
 import (
 	"log"
+	"time"
 
 	"github.com/winterheatherica/tokoaku-backend/internal/models"
 	"gorm.io/gorm"
 )
 
 func SeedProviders(db *gorm.DB) {
-
 	providers := []models.Provider{
-		{ID: 1, Name: "password"},
-		{ID: 2, Name: "google"},
-		{ID: 3, Name: "github"},
+		{ID: 1, Name: "Email & Password (Firebase)", CreatedAt: time.Now()},
+		{ID: 2, Name: "Google (Firebase)", CreatedAt: time.Now()},
+		{ID: 11, Name: "Cloudinary", CreatedAt: time.Now()},
+		{ID: 12, Name: "Upstash (Redis)", CreatedAt: time.Now()},
 	}
 
 	for _, p := range providers {
@@ -21,5 +22,5 @@ func SeedProviders(db *gorm.DB) {
 		}
 	}
 
-	log.Println("[SEEDER] ⚙️  Provider seeded")
+	log.Println("[SEEDER] ⚙️  providers seeded")
 }

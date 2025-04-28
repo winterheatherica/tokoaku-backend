@@ -11,6 +11,7 @@ import (
 	"github.com/winterheatherica/tokoaku-backend/internal/services/database"
 	"github.com/winterheatherica/tokoaku-backend/internal/services/firebase"
 	"github.com/winterheatherica/tokoaku-backend/internal/services/redis"
+	"github.com/winterheatherica/tokoaku-backend/internal/utils"
 )
 
 func VerifyToken(c *fiber.Ctx) error {
@@ -27,26 +28,42 @@ func VerifyToken(c *fiber.Ctx) error {
 		})
 	}
 
-	lockKey := "lock:verify:" + body.Email
-	ok, err := redis.Client.SetNX(redis.Ctx, lockKey, "locked", 30*time.Second).Result()
-	if err != nil || !ok {
-		log.Println("Verifikasi sudah berjalan untuk", body.Email)
-		return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
-			"message": "Verifikasi sedang diproses. Coba beberapa saat lagi.",
-		})
-	}
-	defer redis.Client.Del(redis.Ctx, lockKey)
-
-	log.Printf("Verifikasi untuk %s dengan token %s\n", body.Email, body.Token)
-
 	if body.Email == "" || body.Token == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"message": "Email dan token wajib diisi",
 		})
 	}
 
+	ctx := context.Background()
+
+	prefix, err := utils.GetVolatileRedisPrefix()
+	if err != nil {
+		log.Println("Gagal ambil volatile prefix:", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Gagal inisialisasi cache",
+		})
+	}
+
+	redisClient, err := redis.GetRedisClient(prefix)
+	if err != nil {
+		log.Println("Gagal ambil Redis client:", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Gagal mengakses cache",
+		})
+	}
+
+	lockKey := "lock:verify:" + body.Email
+	ok, err := redisClient.SetNX(ctx, lockKey, "locked", 30*time.Second).Result()
+	if err != nil || !ok {
+		log.Println("Verifikasi sudah berjalan untuk", body.Email)
+		return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+			"message": "Verifikasi sedang diproses. Coba beberapa saat lagi.",
+		})
+	}
+	defer redisClient.Del(ctx, lockKey)
+
 	redisKey := "verify:" + body.Email
-	savedToken, err := redis.Client.Get(redis.Ctx, redisKey).Result()
+	savedToken, err := redisClient.Get(ctx, redisKey).Result()
 	if err != nil || savedToken != body.Token {
 		log.Println("Token verifikasi salah atau kadaluarsa")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
@@ -62,7 +79,7 @@ func VerifyToken(c *fiber.Ctx) error {
 	}
 
 	passKey := "plainpass:" + body.Email
-	passwordPlain, err := redis.Client.Get(redis.Ctx, passKey).Result()
+	passwordPlain, err := redisClient.Get(ctx, passKey).Result()
 	if err != nil {
 		log.Println("Gagal ambil password plaintext:", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -70,7 +87,6 @@ func VerifyToken(c *fiber.Ctx) error {
 		})
 	}
 
-	ctx := context.Background()
 	authClient, err := firebase.App.Auth(ctx)
 	if err != nil {
 		log.Println("Firebase Auth init error:", err)
@@ -93,7 +109,8 @@ func VerifyToken(c *fiber.Ctx) error {
 		ID:           userRecord.UID,
 		Email:        pending.Email,
 		PasswordHash: &pending.PasswordHash,
-		Role:         0,
+		RoleID:       1,
+		ProviderID:   1,
 	}
 
 	if err := database.DB.Create(&newUser).Error; err != nil {
@@ -103,8 +120,16 @@ func VerifyToken(c *fiber.Ctx) error {
 		})
 	}
 
+	roleName, err := utils.GetRoleNameByID(int(newUser.RoleID))
+	if err != nil {
+		log.Println("Gagal ambil nama role:", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Gagal mengambil role user",
+		})
+	}
+
 	claims := map[string]interface{}{
-		"role": newUser.Role,
+		"role": roleName,
 	}
 	err = firebase.FirebaseAuth.SetCustomUserClaims(ctx, newUser.ID, claims)
 	if err != nil {
@@ -124,17 +149,17 @@ func VerifyToken(c *fiber.Ctx) error {
 		})
 	}
 
-	_ = redis.Client.Del(redis.Ctx, redisKey)
-	_ = redis.Client.Del(redis.Ctx, passKey)
+	_ = redisClient.Del(ctx, redisKey)
+	_ = redisClient.Del(ctx, passKey)
 	_ = database.DB.Delete(&models.PendingUser{}, "email = ?", body.Email)
 
-	log.Println("Verifikasi berhasil dan user dibuat:", userRecord.Email)
+	log.Println("Verifikasi berhasil & user dibuat:", userRecord.Email)
 
 	return c.JSON(fiber.Map{
 		"message":     "Akun berhasil diverifikasi dan dibuat",
 		"customToken": customToken,
 		"email":       body.Email,
 		"uid":         userRecord.UID,
-		"role":        newUser.Role,
+		"role":        roleName,
 	})
 }

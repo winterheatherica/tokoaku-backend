@@ -2,7 +2,9 @@ package seed
 
 import (
 	"log"
+	"time"
 
+	"github.com/winterheatherica/tokoaku-backend/config"
 	"github.com/winterheatherica/tokoaku-backend/internal/models"
 	"gorm.io/gorm"
 )
@@ -10,9 +12,10 @@ import (
 func SeedRoles(db *gorm.DB) {
 
 	roles := []models.Role{
-		{ID: 1, Name: "user"},
-		{ID: 2, Name: "vendor"},
-		{ID: 3, Name: "admin"},
+		{ID: 1, Name: "Customer", CreatedAt: time.Now()},
+		{ID: 2, Name: "Seller", CreatedAt: time.Now()},
+		{ID: 3, Name: "Admin", CreatedAt: time.Now()},
+		{ID: 4, Name: config.App.PlatformName, CreatedAt: time.Now()},
 	}
 
 	for _, role := range roles {
@@ -21,5 +24,5 @@ func SeedRoles(db *gorm.DB) {
 		}
 	}
 
-	log.Println("[SEEDER] ⚙️  Role seeded")
+	log.Println("[SEEDER] ⚙️  roles seeded")
 }

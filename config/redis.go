@@ -16,18 +16,16 @@ func LoadRedisConfig() {
 	rawURL := os.Getenv("REDIS_URL")
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
-		Redis.Host = ""
-		Redis.Password = ""
-		Redis.UseTLS = false
-		return
+		log.Fatalf("[CONFIG]: Failed to parse REDIS_URL: %v", err)
 	}
 
 	Redis.Host = parsed.Host
+
 	if parsed.User != nil {
 		Redis.Password, _ = parsed.User.Password()
 	}
 
 	Redis.UseTLS = parsed.Scheme == "rediss"
 
-	log.Println("[CONFIG]: ⚙️  Redis config initialized")
+	log.Printf("[CONFIG]: ⚙️  Redis config initialized | Host: %s | TLS: %v", Redis.Host, Redis.UseTLS)
 }
