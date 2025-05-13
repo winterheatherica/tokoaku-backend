@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/winterheatherica/tokoaku-backend/internal/controllers/admin"
+	admin "github.com/winterheatherica/tokoaku-backend/internal/controllers/admin"
 )
 
 func AdminRoutes(router fiber.Router) {

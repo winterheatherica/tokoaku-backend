@@ -10,9 +10,9 @@ import (
 
 func SeedProductForms(db *gorm.DB) {
 	productForms := []models.ProductForm{
-		{ID: 1, Form: "physical", CreatedAt: time.Now()},
-		{ID: 2, Form: "digital", CreatedAt: time.Now()},
-		{ID: 3, Form: "service", CreatedAt: time.Now()},
+		{ID: 1, Form: "Physical", CreatedAt: time.Now()},
+		{ID: 2, Form: "Digital", CreatedAt: time.Now()},
+		{ID: 3, Form: "Service", CreatedAt: time.Now()},
 	}
 
 	for _, pf := range productForms {

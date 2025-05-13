@@ -8,6 +8,7 @@ import (
 
 func RunAllSeeders(db *gorm.DB) {
 	SeedValueTypes(db)
+	SeedEventTypes(db)
 	SeedBankLists(db)
 	SeedDefaultFees(db)
 	SeedBankTransferFees(db)
@@ -25,6 +26,7 @@ func RunAllSeeders(db *gorm.DB) {
 	SeedSentiments(db)
 	SeedShippingOptions(db)
 	SeedStatuses(db)
+	SeedCurrentEvent(db)
 
 	log.Println("[SEEDER] ✅ All seeders executed")
 }

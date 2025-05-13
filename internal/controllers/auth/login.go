@@ -8,7 +8,7 @@ import (
 	"github.com/winterheatherica/tokoaku-backend/internal/models"
 	"github.com/winterheatherica/tokoaku-backend/internal/services/database"
 	firebaseService "github.com/winterheatherica/tokoaku-backend/internal/services/firebase"
-	"github.com/winterheatherica/tokoaku-backend/internal/utils"
+	"github.com/winterheatherica/tokoaku-backend/internal/utils/fetcher"
 )
 
 func Login(c *fiber.Ctx) error {
@@ -35,7 +35,7 @@ func Login(c *fiber.Ctx) error {
 		})
 	}
 
-	roleName, err := utils.GetRoleNameByID(int(user.RoleID))
+	roleName, err := fetcher.GetRoleNameByID(int(user.RoleID))
 	if err != nil {
 		log.Println("[BACKEND] Gagal ambil role:", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

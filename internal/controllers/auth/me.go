@@ -7,7 +7,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/winterheatherica/tokoaku-backend/internal/models"
 	"github.com/winterheatherica/tokoaku-backend/internal/services/database"
-	"github.com/winterheatherica/tokoaku-backend/internal/utils"
+	"github.com/winterheatherica/tokoaku-backend/internal/utils/fetcher"
 )
 
 func Me(c *fiber.Ctx) error {
@@ -29,7 +29,7 @@ func Me(c *fiber.Ctx) error {
 		})
 	}
 
-	roleName, err := utils.GetRoleNameByID(int(user.RoleID))
+	roleName, err := fetcher.GetRoleNameByID(int(user.RoleID))
 	if err != nil {
 		log.Println("Gagal ambil nama role:", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

@@ -3,10 +3,10 @@ package services
 import (
 	"log"
 
-	"github.com/winterheatherica/tokoaku-backend/internal/services/cloudinary"
 	"github.com/winterheatherica/tokoaku-backend/internal/services/database"
 	"github.com/winterheatherica/tokoaku-backend/internal/services/firebase"
 	"github.com/winterheatherica/tokoaku-backend/internal/services/redis"
+	"github.com/winterheatherica/tokoaku-backend/internal/utils/cloudinary"
 )
 
 func InitAll() {

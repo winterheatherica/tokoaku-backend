@@ -2,10 +2,20 @@ package handlers
 
 import (
 	"github.com/gofiber/fiber/v2"
-	sellercontroller "github.com/winterheatherica/tokoaku-backend/internal/controllers/seller"
+	seller "github.com/winterheatherica/tokoaku-backend/internal/controllers/seller"
 )
 
 func SellerRoutes(router fiber.Router) {
-	router.Get("/product-types", sellercontroller.GetAllProductTypes)
-	router.Post("/products", sellercontroller.AddProduct)
+	router.Post("/products", seller.AddProduct)
+	router.Post("/products/upload-image", seller.UploadProductImage)
+	router.Post("/products/:id/variants", seller.AddProductVariant)
+	router.Post("/variants/:id/images", seller.UploadProductVariantImage)
+	router.Post("/variants/:id/price", seller.SetProductVariantPrice)
+	router.Post("/variants/:id/cover", seller.SetVariantCover)
+
+	router.Get("/products", seller.GetSellerProducts)
+	router.Get("/products/:id", seller.GetSellerProductDetail)
+	router.Get("/products/:id/variants", seller.GetProductVariants)
+	router.Get("/variants/:id/images", seller.GetProductVariantImages)
+	router.Get("/variants/:id/price", seller.GetLatestProductVariantPrice)
 }

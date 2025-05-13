@@ -3,13 +3,14 @@ package models
 import "time"
 
 type ProductVariant struct {
-	ID                   uint      `gorm:"primaryKey;autoIncrement" json:"id"`
-	VariantName          string    `gorm:"type:varchar(255);not null" json:"variant_name"`
-	ProductID            uint      `gorm:"not null" json:"product_id"`
-	ProductVariantSlugID uint      `gorm:"not null" json:"product_variant_slug_id"`
-	Stock                uint      `gorm:"not null" json:"stock"`
-	CreatedAt            time.Time `gorm:"autoCreateTime" json:"created_at"`
+	ID          string    `gorm:"primaryKey;type:varchar(100)" json:"id"`
+	VariantName string    `gorm:"type:varchar(255);not null" json:"variant_name"`
+	ProductID   string    `gorm:"type:varchar(100);not null;uniqueIndex:product_slug" json:"product_id"`
+	Stock       uint      `gorm:"not null" json:"stock"`
+	Slug        string    `gorm:"type:varchar(255);not null;uniqueIndex:product_slug" json:"slug"`
+	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
 
-	ProductVariantSlug ProductVariantSlug `gorm:"foreignKey:ProductVariantSlugID;references:ID" json:"product_variant_slug"`
-	Product            Product            `gorm:"foreignKey:ProductID" json:"product"`
+	Product Product `gorm:"foreignKey:ProductID" json:"product"`
+
+	ProductVariantPrices []ProductPrice `gorm:"foreignKey:ProductVariantID" json:"product_variant_prices"`
 }
