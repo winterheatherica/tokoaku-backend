@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"strconv"
+	"strings"
 	"time"
 
 	"github.com/winterheatherica/tokoaku-backend/internal/models"
@@ -18,6 +18,117 @@ type VariantPriceResult struct {
 	CreatedAt        *time.Time `json:"created_at"`
 }
 
+type VariantPriceWithDiscount struct {
+	ProductVariantID string            `json:"product_variant_id"`
+	OriginalPrice    *uint             `json:"original_price"`
+	FinalPrice       *uint             `json:"final_price"`
+	AppliedDiscounts []models.Discount `json:"applied_discounts"`
+	CreatedAt        *time.Time        `json:"created_at"`
+}
+
+type DiscountDTO struct {
+	ID        uint   `json:"id"`
+	Name      string `json:"name"`
+	Value     uint   `json:"value"`
+	ValueType string `json:"value_type"`
+	Sponsor   string `json:"sponsor,omitempty"`
+}
+
+type PriceWithDiscountResponse struct {
+	ProductVariantID string        `json:"product_variant_id"`
+	OriginalPrice    *uint         `json:"original_price"`
+	FinalPrice       *uint         `json:"final_price"`
+	CreatedAt        *time.Time    `json:"created_at"`
+	Discounts        []DiscountDTO `json:"discounts"`
+}
+
+func GetPriceWithDiscountForUI(ctx context.Context, variantID string) (*PriceWithDiscountResponse, error) {
+	data, err := GetPriceWithDiscount(ctx, variantID)
+	if err != nil {
+		return nil, err
+	}
+
+	var discounts []DiscountDTO
+	for _, d := range data.AppliedDiscounts {
+		sponsorName := ""
+		if d.DiscountSponsor.Role.ID != 0 {
+			sponsorName = d.DiscountSponsor.Role.Name
+		}
+
+		discounts = append(discounts, DiscountDTO{
+			ID:        d.ID,
+			Name:      d.Name,
+			Value:     d.Value,
+			ValueType: d.ValueType.Name,
+			Sponsor:   sponsorName,
+		})
+	}
+
+	return &PriceWithDiscountResponse{
+		ProductVariantID: data.ProductVariantID,
+		OriginalPrice:    data.OriginalPrice,
+		FinalPrice:       data.FinalPrice,
+		CreatedAt:        data.CreatedAt,
+		Discounts:        discounts,
+	}, nil
+}
+
+func GetPriceWithDiscount(ctx context.Context, variantID string) (*VariantPriceWithDiscount, error) {
+	priceData, err := GetLatestPriceForVariant(ctx, variantID)
+	if err != nil || priceData.Price == nil {
+		return &VariantPriceWithDiscount{
+			ProductVariantID: variantID,
+			OriginalPrice:    nil,
+			FinalPrice:       nil,
+			AppliedDiscounts: []models.Discount{},
+			CreatedAt:        nil,
+		}, nil
+	}
+
+	discounts, err := GetTopDiscountsByCurrentEventLimit(ctx, variantID)
+	if err != nil {
+		log.Printf("[DISCOUNT] ⚠️ Gagal ambil diskon aktif: %v", err)
+		discounts = []models.Discount{}
+	}
+
+	price := *priceData.Price
+	totalFlat := uint(0)
+	totalPercentage := float64(0)
+	var applied []models.Discount
+
+	for _, d := range discounts {
+		if d.Value == 0 {
+			continue
+		}
+		switch strings.ToLower(d.ValueType.Name) {
+		case "flat":
+			totalFlat += d.Value
+			applied = append(applied, d)
+		case "percentage":
+			totalPercentage += float64(d.Value)
+			applied = append(applied, d)
+		}
+	}
+
+	afterFlat := int(price) - int(totalFlat)
+	if afterFlat < 0 {
+		afterFlat = 0
+	}
+	afterPercentage := float64(afterFlat) * (1.0 - totalPercentage/100.0)
+	final := uint(afterPercentage)
+
+	log.Printf("[DEBUG] Harga asli: %d, totalFlat: %d, totalPercentage: %.2f%%", price, totalFlat, totalPercentage)
+	log.Printf("[DEBUG] Setelah flat: %d, setelah persen: %d", afterFlat, final)
+
+	return &VariantPriceWithDiscount{
+		ProductVariantID: variantID,
+		OriginalPrice:    &price,
+		FinalPrice:       &final,
+		AppliedDiscounts: applied,
+		CreatedAt:        priceData.CreatedAt,
+	}, nil
+}
+
 func GetLatestPriceForVariant(ctx context.Context, variantID string) (*VariantPriceResult, error) {
 	var variant models.ProductVariant
 	if err := database.DB.
@@ -28,10 +139,9 @@ func GetLatestPriceForVariant(ctx context.Context, variantID string) (*VariantPr
 		log.Printf("[DB] ❌ Gagal ambil product_id dari variant %s: %v", variantID, err)
 		return nil, err
 	}
-	productID := variant.ProductID
 
 	rdb, err := volatile.GetVolatileRedisClient(ctx)
-	hashKey := fmt.Sprintf("product_variant:%s:%s", productID, variantID)
+	hashKey := fmt.Sprintf("product_variant:%s:%s", variant.ProductID, variantID)
 
 	if err == nil {
 		data, err := rdb.HMGet(ctx, hashKey, "latest_price", "latest_price_created_at").Result()
@@ -57,21 +167,19 @@ func GetLatestPriceForVariant(ctx context.Context, variantID string) (*VariantPr
 		Order("created_at DESC").
 		First(&price).Error
 
-	var result *VariantPriceResult
-
 	if err != nil {
 		log.Printf("[DB] ❌ Harga variant %s tidak ditemukan: %v", variantID, err)
-		result = &VariantPriceResult{
+		return &VariantPriceResult{
 			ProductVariantID: variantID,
 			Price:            nil,
 			CreatedAt:        nil,
-		}
-	} else {
-		result = &VariantPriceResult{
-			ProductVariantID: price.ProductVariantID,
-			Price:            &price.Price,
-			CreatedAt:        &price.CreatedAt,
-		}
+		}, nil
+	}
+
+	result := &VariantPriceResult{
+		ProductVariantID: price.ProductVariantID,
+		Price:            &price.Price,
+		CreatedAt:        &price.CreatedAt,
 	}
 
 	if rdb != nil && result.Price != nil && result.CreatedAt != nil {
@@ -86,8 +194,103 @@ func GetLatestPriceForVariant(ctx context.Context, variantID string) (*VariantPr
 	return result, nil
 }
 
-func parseUintFromString(val interface{}) (uint, error) {
-	str := fmt.Sprintf("%v", val)
-	n, err := strconv.ParseUint(str, 10, 32)
-	return uint(n), err
+func GetPriceAtTimeForUI(ctx context.Context, variantID string, orderTime time.Time) (*PriceWithDiscountResponse, error) {
+	var price models.ProductPrice
+	err := database.DB.
+		WithContext(ctx).
+		Where("product_variant_id = ? AND created_at <= ?", variantID, orderTime).
+		Order("created_at DESC").
+		First(&price).Error
+
+	if err != nil || price.Price == 0 {
+		return &PriceWithDiscountResponse{
+			ProductVariantID: variantID,
+			OriginalPrice:    nil,
+			FinalPrice:       nil,
+			CreatedAt:        nil,
+			Discounts:        []DiscountDTO{},
+		}, nil
+	}
+
+	priceUint := price.Price
+	createdAt := price.CreatedAt
+
+	return &PriceWithDiscountResponse{
+		ProductVariantID: variantID,
+		OriginalPrice:    &priceUint,
+		FinalPrice:       &priceUint,
+		CreatedAt:        &createdAt,
+		Discounts:        []DiscountDTO{},
+	}, nil
+}
+
+func GetHistoricalPriceWithDiscount(ctx context.Context, variantID string, orderTime time.Time) (*PriceWithDiscountResponse, error) {
+	var price models.ProductPrice
+	err := database.DB.
+		WithContext(ctx).
+		Where("product_variant_id = ? AND created_at <= ?", variantID, orderTime).
+		Order("created_at DESC").
+		First(&price).Error
+
+	if err != nil || price.Price == 0 {
+		log.Printf("[HISTORIC_PRICE] Tidak ditemukan harga untuk %s sebelum %v", variantID, orderTime)
+		return &PriceWithDiscountResponse{
+			ProductVariantID: variantID,
+			OriginalPrice:    nil,
+			FinalPrice:       nil,
+			CreatedAt:        nil,
+			Discounts:        []DiscountDTO{},
+		}, nil
+	}
+
+	discounts, err := GetTopDiscountsByOrderTimestamp(ctx, variantID, orderTime)
+	if err != nil {
+		log.Printf("[HISTORIC_DISCOUNT] Gagal ambil diskon historis: %v", err)
+		discounts = []models.Discount{}
+	}
+
+	priceValue := price.Price
+	totalFlat := uint(0)
+	totalPercentage := float64(0)
+	var appliedDiscounts []DiscountDTO
+
+	for _, d := range discounts {
+		switch strings.ToLower(d.ValueType.Name) {
+		case "flat":
+			totalFlat += d.Value
+		case "percentage":
+			totalPercentage += float64(d.Value)
+		}
+
+		sponsor := ""
+		if d.DiscountSponsor.Role.ID != 0 {
+			sponsor = d.DiscountSponsor.Role.Name
+		}
+
+		appliedDiscounts = append(appliedDiscounts, DiscountDTO{
+			ID:        d.ID,
+			Name:      d.Name,
+			Value:     d.Value,
+			ValueType: d.ValueType.Name,
+			Sponsor:   sponsor,
+		})
+	}
+
+	afterFlat := int(priceValue) - int(totalFlat)
+	if afterFlat < 0 {
+		afterFlat = 0
+	}
+	afterPct := float64(afterFlat) * (1 - totalPercentage/100.0)
+	finalPrice := uint(afterPct)
+
+	log.Printf("[HISTORIC_PRICE] Original: %d, Flat: -%d, %%: -%.2f%% → Final: %d",
+		priceValue, totalFlat, totalPercentage, finalPrice)
+
+	return &PriceWithDiscountResponse{
+		ProductVariantID: variantID,
+		OriginalPrice:    &priceValue,
+		FinalPrice:       &finalPrice,
+		CreatedAt:        &price.CreatedAt,
+		Discounts:        appliedDiscounts,
+	}, nil
 }

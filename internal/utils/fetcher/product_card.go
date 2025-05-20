@@ -1,6 +1,9 @@
 package fetcher
 
 import (
+	"context"
+	"log"
+
 	"github.com/winterheatherica/tokoaku-backend/internal/models"
 	"github.com/winterheatherica/tokoaku-backend/internal/services/database"
 )
@@ -27,6 +30,7 @@ func FetchProductCardList() ([]ProductCard, error) {
 		return nil, err
 	}
 
+	ctx := context.Background()
 	var response []ProductCard
 
 	for _, product := range products {
@@ -43,29 +47,28 @@ func FetchProductCardList() ([]ProductCard, error) {
 			variantSlug = variants[0].Slug
 		}
 
-		var prices []models.ProductPrice
-		if len(variants) > 0 {
-			for _, v := range variants {
-				var latestPrice models.ProductPrice
-				if err := database.DB.
-					Where("product_variant_id = ?", v.ID).
-					Order("created_at DESC").
-					First(&latestPrice).Error; err == nil {
-					prices = append(prices, latestPrice)
-				}
-			}
-		}
-
 		var minPrice *uint
 		var maxPrice *uint
-		for _, p := range prices {
-			if minPrice == nil || p.Price < *minPrice {
-				v := p.Price
-				minPrice = &v
+
+		for _, v := range variants {
+			priceWithDiscount, err := GetPriceWithDiscountForUI(ctx, v.ID)
+			if err != nil || priceWithDiscount == nil || priceWithDiscount.FinalPrice == nil {
+				continue
 			}
-			if maxPrice == nil || p.Price > *maxPrice {
-				v := p.Price
-				maxPrice = &v
+
+			final := *priceWithDiscount.FinalPrice
+
+			if minPrice == nil || final < *minPrice {
+				tmp := final
+				minPrice = &tmp
+			}
+			if maxPrice == nil || final > *maxPrice {
+				tmp := final
+				maxPrice = &tmp
+			}
+
+			for _, d := range priceWithDiscount.Discounts {
+				log.Printf("[DISCOUNT] Produk %s pakai diskon ID %d - %s (%s)", product.Name, d.ID, d.Name, d.ValueType)
 			}
 		}
 

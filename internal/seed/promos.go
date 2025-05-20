@@ -18,8 +18,8 @@ func SeedPromos(db *gorm.DB) {
 			Value:         10,
 			MinPriceValue: 100000,
 			MaxValue:      50000,
-			StartDate:     time.Date(2025, 4, 28, 0, 0, 0, 0, time.UTC),
-			EndDate:       time.Date(2025, 12, 12, 23, 59, 59, 0, time.UTC),
+			StartAt:       time.Date(2025, 4, 28, 0, 0, 0, 0, time.UTC),
+			EndAt:         time.Date(2025, 12, 12, 23, 59, 59, 0, time.UTC),
 			CreatedAt:     time.Now(),
 		},
 		{
@@ -30,8 +30,8 @@ func SeedPromos(db *gorm.DB) {
 			Value:         25,
 			MinPriceValue: 50000,
 			MaxValue:      75000,
-			StartDate:     time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
-			EndDate:       time.Date(2025, 6, 30, 23, 59, 59, 0, time.UTC),
+			StartAt:       time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
+			EndAt:         time.Date(2025, 6, 30, 23, 59, 59, 0, time.UTC),
 			CreatedAt:     time.Now(),
 		},
 		{
@@ -42,8 +42,8 @@ func SeedPromos(db *gorm.DB) {
 			Value:         30000,
 			MinPriceValue: 0,
 			MaxValue:      0,
-			StartDate:     time.Date(2025, 7, 7, 0, 0, 0, 0, time.UTC),
-			EndDate:       time.Date(2025, 7, 7, 23, 59, 59, 0, time.UTC),
+			StartAt:       time.Date(2025, 7, 7, 0, 0, 0, 0, time.UTC),
+			EndAt:         time.Date(2025, 7, 7, 23, 59, 59, 0, time.UTC),
 			CreatedAt:     time.Now(),
 		},
 		{
@@ -54,8 +54,8 @@ func SeedPromos(db *gorm.DB) {
 			Value:         45,
 			MinPriceValue: 100000,
 			MaxValue:      100000,
-			StartDate:     time.Date(2025, 8, 17, 0, 0, 0, 0, time.UTC),
-			EndDate:       time.Date(2025, 8, 17, 23, 59, 59, 0, time.UTC),
+			StartAt:       time.Date(2025, 8, 17, 0, 0, 0, 0, time.UTC),
+			EndAt:         time.Date(2025, 8, 17, 23, 59, 59, 0, time.UTC),
 			CreatedAt:     time.Now(),
 		},
 	}

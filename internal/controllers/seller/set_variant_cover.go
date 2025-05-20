@@ -9,11 +9,12 @@ import (
 	"github.com/winterheatherica/tokoaku-backend/internal/models"
 	"github.com/winterheatherica/tokoaku-backend/internal/services/database"
 	"github.com/winterheatherica/tokoaku-backend/internal/utils/fetcher"
-	"github.com/winterheatherica/tokoaku-backend/internal/utils/redis/persistent"
+	"github.com/winterheatherica/tokoaku-backend/internal/utils/redis/volatile"
 )
 
 func SetVariantCover(c *fiber.Ctx) error {
 	variantID := c.Params("id")
+	ctx := context.Background()
 
 	var payload struct {
 		ImageURL string `json:"image_url"`
@@ -25,18 +26,28 @@ func SetVariantCover(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "Image URL is required")
 	}
 
-	if err := ResetCover(variantID); err != nil {
+	if err := resetCover(variantID); err != nil {
+		log.Printf("[DB] ❌ Failed to reset previous cover for variant %s: %v", variantID, err)
 		return fiber.NewError(fiber.StatusInternalServerError, "Failed to reset previous cover")
 	}
 
-	if err := SetCoverImage(variantID, payload.ImageURL); err != nil {
+	if err := setCoverImage(variantID, payload.ImageURL); err != nil {
+		log.Printf("[DB] ❌ Failed to set new cover image for variant %s: %v", variantID, err)
 		return fiber.NewError(fiber.StatusInternalServerError, "Failed to set new cover image")
 	}
 
-	ctx := context.Background()
-	ClearVariantCoverCache(ctx, variantID)
-	if _, err := fetcher.GetVariantCoverImage(ctx, variantID); err != nil {
-		log.Printf("⚠️ Gagal refresh cache cover variant %s: %v", variantID, err)
+	var variant models.ProductVariant
+	if err := database.DB.Select("product_id").Where("id = ?", variantID).First(&variant).Error; err != nil {
+		log.Printf("[DB] ❌ Failed to fetch product_id for variant %s: %v", variantID, err)
+		return fiber.NewError(fiber.StatusInternalServerError, "Failed to refresh cache")
+	}
+
+	if err := ClearVariantImageCache(ctx, variantID); err != nil {
+		log.Printf("[CACHE] ⚠️ Failed to clear cache for variant %s: %v", variantID, err)
+	}
+
+	if err := fetcher.CacheVariantImageFromDB(ctx, variantID); err != nil {
+		log.Printf("[CACHE] ⚠️ Failed to refresh variant image cache from DB: %v", err)
 	}
 
 	return c.JSON(fiber.Map{
@@ -44,27 +55,24 @@ func SetVariantCover(c *fiber.Ctx) error {
 	})
 }
 
-func ResetCover(variantID string) error {
-	return database.DB.
-		Model(&models.ProductVariantImage{}).
+func resetCover(variantID string) error {
+	return database.DB.Model(&models.ProductVariantImage{}).
 		Where("product_variant_id = ?", variantID).
 		Update("is_variant_cover", false).Error
 }
 
-func SetCoverImage(variantID string, imageURL string) error {
-	return database.DB.
-		Model(&models.ProductVariantImage{}).
+func setCoverImage(variantID string, imageURL string) error {
+	return database.DB.Model(&models.ProductVariantImage{}).
 		Where("product_variant_id = ? AND image_url = ?", variantID, imageURL).
 		Update("is_variant_cover", true).Error
 }
 
-func ClearVariantCoverCache(ctx context.Context, variantID string) {
-	rdb, err := persistent.GetPersistentRedisClient(ctx)
-	if err == nil {
-		_ = rdb.Del(ctx, CacheKeyVariantCover(variantID)).Err()
+func ClearVariantImageCache(ctx context.Context, variantID string) error {
+	rdb, err := volatile.GetVolatileRedisClient(ctx)
+	if err != nil {
+		return err
 	}
-}
 
-func CacheKeyVariantCover(variantID string) string {
-	return fmt.Sprintf("variant:cover:%s", variantID)
+	key := fmt.Sprintf("product_variant_images:%s", variantID)
+	return rdb.Del(ctx, key).Err()
 }

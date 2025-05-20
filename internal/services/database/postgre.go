@@ -32,8 +32,6 @@ func Connect() {
 	}
 
 	if err := DB.AutoMigrate(
-		&models.ActiveAddress{},
-		&models.ActiveBankAccount{},
 		&models.Address{},
 		&models.BankAccount{},
 		&models.BankList{},

@@ -45,7 +45,7 @@ func GetProductVariantBySlug(ctx context.Context, productID, variantSlug string)
 	}
 
 	log.Printf("[DB] ✅ Variant %s untuk produk %s berhasil diambil dari DB", variantSlug, productID)
-	cacheSingleVariant(ctx, productID, &variant)
+	CacheSingleVariant(ctx, productID, &variant)
 	return &variant, nil
 }
 
@@ -141,10 +141,10 @@ func cacheVariants(ctx context.Context, productID string, variants []models.Prod
 	}
 }
 
-func cacheSingleVariant(ctx context.Context, productID string, variant *models.ProductVariant) {
+func CacheSingleVariant(ctx context.Context, productID string, variant *models.ProductVariant) error {
 	rdb, err := volatile.GetVolatileRedisClient(ctx)
 	if err != nil {
-		return
+		return err
 	}
 
 	hashKey := fmt.Sprintf("product_variant:%s:%s", productID, variant.ID)
@@ -155,12 +155,15 @@ func cacheSingleVariant(ctx context.Context, productID string, variant *models.P
 		"stock":        variant.Stock,
 		"created_at":   variant.CreatedAt.Format(time.RFC3339),
 	}
-	if err := rdb.HSet(ctx, hashKey, data).Err(); err == nil {
-		_ = rdb.Expire(ctx, hashKey, 5*time.Minute).Err()
-		log.Printf("[CACHE] ✅ Simpan variant %s ke Redis", variant.ID)
-	} else {
-		log.Printf("[CACHE] ❌ Gagal simpan variant %s ke Redis: %v", variant.ID, err)
+	if err := rdb.HSet(ctx, hashKey, data).Err(); err != nil {
+		return err
 	}
+
+	if err := rdb.Expire(ctx, hashKey, 5*time.Minute).Err(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func parseVariantHash(data map[string]string) *models.ProductVariant {
@@ -180,4 +183,13 @@ func parseVariantHash(data map[string]string) *models.ProductVariant {
 func parseUint(s string) uint {
 	n, _ := strconv.ParseUint(s, 10, 32)
 	return uint(n)
+}
+
+func InvalidateVariantCache(ctx context.Context, productID string) error {
+	rdb, err := volatile.GetVolatileRedisClient(ctx)
+	if err != nil {
+		return err
+	}
+	key := fmt.Sprintf("product_variant:%s:ids", productID)
+	return rdb.Del(ctx, key).Err()
 }

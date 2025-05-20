@@ -17,7 +17,6 @@ func GetLatestProductVariantPrice(c *fiber.Ctx) error {
 
 	ctx := context.Background()
 
-	// Ambil product_id dari variant
 	var variant models.ProductVariant
 	if err := database.DB.
 		WithContext(ctx).

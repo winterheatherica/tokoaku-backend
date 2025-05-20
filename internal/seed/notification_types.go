@@ -1,13 +1,14 @@
 package seed
 
 import (
+	"log"
 	"time"
 
 	"github.com/winterheatherica/tokoaku-backend/internal/models"
 	"gorm.io/gorm"
 )
 
-func SeedNotificationTypes(db *gorm.DB) error {
+func SeedNotificationTypes(db *gorm.DB) {
 	notificationTypes := []models.NotificationType{
 		{Name: "Order Update", CreatedAt: time.Now()},
 		{Name: "Payment Reminder", CreatedAt: time.Now()},
@@ -21,8 +22,12 @@ func SeedNotificationTypes(db *gorm.DB) error {
 		{Name: "Loyalty Reward", CreatedAt: time.Now()},
 	}
 
-	if err := db.Create(&notificationTypes).Error; err != nil {
-		return err
+	for _, nt := range notificationTypes {
+		ntItem := nt
+		if err := db.FirstOrCreate(&ntItem, models.NotificationType{Name: ntItem.Name}).Error; err != nil {
+			log.Printf("❌ Gagal seeding notification_type %s: %v\n", ntItem.Name, err)
+		}
 	}
-	return nil
+
+	log.Println("[SEEDER] 🔔 Notification types seeded")
 }

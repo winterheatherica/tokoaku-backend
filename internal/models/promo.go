@@ -11,8 +11,8 @@ type Promo struct {
 	Value         uint      `gorm:"not null" json:"value"`
 	MinPriceValue uint      `gorm:"default:0" json:"min_price_value"`
 	MaxValue      uint      `gorm:"default:0" json:"max_value"`
-	StartDate     time.Time `gorm:"not null" json:"start_date"`
-	EndDate       time.Time `gorm:"not null" json:"end_date"`
+	StartAt       time.Time `gorm:"not null" json:"start_at"`
+	EndAt         time.Time `gorm:"not null" json:"end_at"`
 	CreatedAt     time.Time `gorm:"autoCreateTime" json:"created_at"`
 
 	ValueType ValueType `gorm:"foreignKey:ValueTypeID;references:ID" json:"value_type"`

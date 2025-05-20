@@ -8,8 +8,8 @@ type Discount struct {
 	ValueTypeID uint      `gorm:"not null" json:"value_type_id"`
 	Value       uint      `gorm:"not null" json:"value"`
 	SponsorID   uint      `gorm:"not null" json:"sponsor_id"`
-	Start       time.Time `gorm:"not null" json:"start"`
-	End         time.Time `gorm:"not null" json:"end"`
+	StartAt     time.Time `gorm:"column:start_at"`
+	EndAt       time.Time `gorm:"column:end_at"`
 	Slug        string    `gorm:"uniqueIndex;not null" json:"slug"`
 	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
 

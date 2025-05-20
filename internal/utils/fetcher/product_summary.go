@@ -26,7 +26,7 @@ func GetAllProductSummaries(ctx context.Context) ([]ProductSummary, error) {
 		WithContext(ctx).
 		Preload("ProductType").
 		Preload("ProductForm").
-		Preload("Variants.ProductVariantPrices").
+		Preload("Variants").
 		Order("created_at DESC").
 		Find(&products).Error
 	if err != nil {
@@ -49,12 +49,14 @@ func GetAllProductSummaries(ctx context.Context) ([]ProductSummary, error) {
 			}
 			defaultVariantSlug = earliest.Slug
 
-			for _, v := range product.Variants {
-				for _, p := range v.ProductVariantPrices {
-					if minPrice == nil || p.Price < *minPrice {
-						price := p.Price
-						minPrice = &price
-					}
+			for _, variant := range product.Variants {
+				priceData, err := GetPriceWithDiscount(ctx, variant.ID)
+				if err != nil || priceData.FinalPrice == nil {
+					continue
+				}
+				if minPrice == nil || *priceData.FinalPrice < *minPrice {
+					val := *priceData.FinalPrice
+					minPrice = &val
 				}
 			}
 		}

@@ -1,10 +1,13 @@
 package seller
 
 import (
+	"log"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/winterheatherica/tokoaku-backend/internal/models"
 	"github.com/winterheatherica/tokoaku-backend/internal/services/database"
 	cloudutil "github.com/winterheatherica/tokoaku-backend/internal/utils/cloudinary"
+	"github.com/winterheatherica/tokoaku-backend/internal/utils/fetcher"
 )
 
 func UploadProductVariantImage(c *fiber.Ctx) error {
@@ -44,6 +47,14 @@ func UploadProductVariantImage(c *fiber.Ctx) error {
 	}
 	if err := database.DB.Create(&imageRecord).Error; err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, "Failed to save image record")
+	}
+
+	ctx := c.Context()
+	if err := fetcher.ClearVariantImageCache(ctx, productVariantID); err != nil {
+		log.Printf("[CACHE] ⚠️ Gagal hapus cache variant %s: %v", productVariantID, err)
+	}
+	if err := fetcher.CacheVariantImageFromDB(ctx, productVariantID); err != nil {
+		log.Printf("[CACHE] ⚠️ Gagal cache ulang variant %s: %v", productVariantID, err)
 	}
 
 	return c.JSON(fiber.Map{

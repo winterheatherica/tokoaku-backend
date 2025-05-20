@@ -22,5 +22,6 @@ type Product struct {
 	CloudService CloudService `gorm:"foreignKey:CloudImageID" json:"cloud_service"`
 	ProductForm  ProductForm  `gorm:"foreignKey:ProductFormID" json:"product_form"`
 
-	Variants []ProductVariant `gorm:"foreignKey:ProductID" json:"variants"`
+	Variants          []ProductVariant  `gorm:"foreignKey:ProductID" json:"variants"`
+	ProductCategories []ProductCategory `gorm:"foreignKey:ProductID"`
 }

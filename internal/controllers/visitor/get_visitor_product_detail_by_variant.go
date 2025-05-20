@@ -25,13 +25,18 @@ func GetVisitorProductDetailByVariant(c *fiber.Ctx) error {
 
 	images, err := fetcher.GetAllVariantImages(ctx, variant.ID)
 	if err != nil {
-		images = []models.ProductVariantImage{}
+		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 
-	latestPrice, err := fetcher.GetLatestPriceForVariant(ctx, variant.ID)
-	if err != nil || latestPrice.Price == nil {
+	priceInfo, err := fetcher.GetPriceWithDiscountForUI(ctx, variant.ID)
+	if err != nil || priceInfo.OriginalPrice == nil || priceInfo.FinalPrice == nil {
 		zero := uint(0)
-		latestPrice.Price = &zero
+		priceInfo = &fetcher.PriceWithDiscountResponse{
+			ProductVariantID: variant.ID,
+			OriginalPrice:    &zero,
+			FinalPrice:       &zero,
+			Discounts:        []fetcher.DiscountDTO{},
+		}
 	}
 
 	allVariants, err := fetcher.GetProductVariantsByProductID(ctx, product.ID)
@@ -39,44 +44,19 @@ func GetVisitorProductDetailByVariant(c *fiber.Ctx) error {
 		allVariants = []models.ProductVariant{}
 	}
 
-	if len(images) == 0 && product.ImageCoverURL != "" {
-		images = []models.ProductVariantImage{
-			{
-				ImageURL:       product.ImageCoverURL,
-				IsVariantCover: true,
-			},
-		}
-	}
-
 	return c.JSON(fiber.Map{
-		"product": fiber.Map{
-			"id":              product.ID,
-			"name":            product.Name,
-			"description":     product.Description,
-			"image_cover_url": product.ImageCoverURL,
-			"product_type":    product.ProductType.Name,
-			"product_form":    product.ProductForm.Form,
-			"slug":            product.Slug,
-		},
+		"product": product,
 		"variant": fiber.Map{
-			"id":           variant.ID,
-			"name":         variant.VariantName,
-			"slug":         variant.Slug,
-			"stock":        variant.Stock,
-			"images":       images,
-			"latest_price": latestPrice.Price,
+			"id":             variant.ID,
+			"name":           variant.VariantName,
+			"slug":           variant.Slug,
+			"stock":          variant.Stock,
+			"created_at":     variant.CreatedAt,
+			"original_price": priceInfo.OriginalPrice,
+			"final_price":    priceInfo.FinalPrice,
+			"discounts":      priceInfo.Discounts,
+			"images":         images,
 		},
-		"all_variants": func() []fiber.Map {
-			list := []fiber.Map{}
-			for _, v := range allVariants {
-				list = append(list, fiber.Map{
-					"id":           v.ID,
-					"variant_name": v.VariantName,
-					"slug":         v.Slug,
-					"created_at":   v.CreatedAt,
-				})
-			}
-			return list
-		}(),
+		"all_variants": allVariants,
 	})
 }

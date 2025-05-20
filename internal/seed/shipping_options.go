@@ -73,6 +73,15 @@ func SeedShippingOptions(db *gorm.DB) {
 			ServiceType:        "Regular",
 			CreatedAt:          time.Now(),
 		},
+		{
+			ID:                 100,
+			CourierName:        "None",
+			CourierServiceName: "None",
+			Fee:                0,
+			EstimatedTime:      "None",
+			ServiceType:        "None",
+			CreatedAt:          time.Now(),
+		},
 	}
 
 	for _, s := range shippingOptions {

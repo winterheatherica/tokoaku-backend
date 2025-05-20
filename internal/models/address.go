@@ -15,6 +15,7 @@ type Address struct {
 	PostalCode  string    `gorm:"not null" json:"postal_code"`
 	Latitude    float64   `gorm:"type:float" json:"latitude"`
 	Longitude   float64   `gorm:"type:float" json:"longitude"`
+	IsActive    bool      `gorm:"default:false" json:"is_active"`
 	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
 
 	User User `gorm:"foreignKey:UserID;references:ID" json:"user"`

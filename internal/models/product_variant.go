@@ -10,7 +10,7 @@ type ProductVariant struct {
 	Slug        string    `gorm:"type:varchar(255);not null;uniqueIndex:product_slug" json:"slug"`
 	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
 
-	Product Product `gorm:"foreignKey:ProductID" json:"product"`
+	Product Product `gorm:"foreignKey:ProductID;references:ID" json:"product"`
 
 	ProductVariantPrices []ProductPrice `gorm:"foreignKey:ProductVariantID" json:"product_variant_prices"`
 }
