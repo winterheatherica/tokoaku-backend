@@ -17,4 +17,6 @@ type Order struct {
 	Customer      User          `gorm:"foreignKey:CustomerID;references:ID" json:"customer"`
 	PaymentMethod PaymentMethod `gorm:"foreignKey:PaymentMethodID;references:ID" json:"payment_method"`
 	Address       Address       `gorm:"foreignKey:AddressID;references:ID" json:"address"`
+
+	OrderShippings []OrderShipping `gorm:"foreignKey:OrderID" json:"order_shippings"`
 }

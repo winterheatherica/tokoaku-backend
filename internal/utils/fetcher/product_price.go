@@ -48,8 +48,16 @@ func GetPriceWithDiscountForUI(ctx context.Context, variantID string) (*PriceWit
 		return nil, err
 	}
 
+	limit := 1
+	if ce, err := GetCurrentEvent(ctx); err == nil && ce != nil {
+		limit = int(ce.EventType.DiscountLimit)
+	}
+
 	var discounts []DiscountDTO
-	for _, d := range data.AppliedDiscounts {
+	for i, d := range data.AppliedDiscounts {
+		if i >= limit {
+			break
+		}
 		sponsorName := ""
 		if d.DiscountSponsor.Role.ID != 0 {
 			sponsorName = d.DiscountSponsor.Role.Name
@@ -91,9 +99,9 @@ func GetPriceWithDiscount(ctx context.Context, variantID string) (*VariantPriceW
 		discounts = []models.Discount{}
 	}
 
-	price := *priceData.Price
-	totalFlat := uint(0)
-	totalPercentage := float64(0)
+	price := float64(*priceData.Price)
+	totalFlat := float64(0)
+	totalPercentage := float64(1.0)
 	var applied []models.Discount
 
 	for _, d := range discounts {
@@ -101,28 +109,37 @@ func GetPriceWithDiscount(ctx context.Context, variantID string) (*VariantPriceW
 			continue
 		}
 		switch strings.ToLower(d.ValueType.Name) {
-		case "flat":
-			totalFlat += d.Value
-			applied = append(applied, d)
 		case "percentage":
-			totalPercentage += float64(d.Value)
+			percentage := float64(d.Value) / 100.0
+			totalPercentage *= (1 - percentage)
 			applied = append(applied, d)
 		}
 	}
 
-	afterFlat := int(price) - int(totalFlat)
+	for _, d := range discounts {
+		if d.Value == 0 {
+			continue
+		}
+		if strings.ToLower(d.ValueType.Name) == "flat" {
+			totalFlat += float64(d.Value)
+			applied = append(applied, d)
+		}
+	}
+
+	afterPercent := price * totalPercentage
+	afterFlat := afterPercent - totalFlat
 	if afterFlat < 0 {
 		afterFlat = 0
 	}
-	afterPercentage := float64(afterFlat) * (1.0 - totalPercentage/100.0)
-	final := uint(afterPercentage)
 
-	log.Printf("[DEBUG] Harga asli: %d, totalFlat: %d, totalPercentage: %.2f%%", price, totalFlat, totalPercentage)
-	log.Printf("[DEBUG] Setelah flat: %d, setelah persen: %d", afterFlat, final)
+	final := uint(afterFlat)
 
+	log.Printf("[DEBUG] Harga asli: %.2f, setelah persen: %.2f, setelah flat: %.2f", price, afterPercent, afterFlat)
+
+	priceUint := uint(price)
 	return &VariantPriceWithDiscount{
 		ProductVariantID: variantID,
-		OriginalPrice:    &price,
+		OriginalPrice:    &priceUint,
 		FinalPrice:       &final,
 		AppliedDiscounts: applied,
 		CreatedAt:        priceData.CreatedAt,
@@ -249,17 +266,21 @@ func GetHistoricalPriceWithDiscount(ctx context.Context, variantID string, order
 		discounts = []models.Discount{}
 	}
 
-	priceValue := price.Price
-	totalFlat := uint(0)
-	totalPercentage := float64(0)
-	var appliedDiscounts []DiscountDTO
+	priceFloat := float64(price.Price)
+	totalPercentage := 1.0
+	totalFlat := float64(0)
+	appliedDiscounts := []DiscountDTO{}
 
 	for _, d := range discounts {
+		if d.Value == 0 {
+			continue
+		}
 		switch strings.ToLower(d.ValueType.Name) {
-		case "flat":
-			totalFlat += d.Value
 		case "percentage":
-			totalPercentage += float64(d.Value)
+			pct := float64(d.Value) / 100.0
+			totalPercentage *= (1 - pct)
+		case "flat":
+			totalFlat += float64(d.Value)
 		}
 
 		sponsor := ""
@@ -276,19 +297,20 @@ func GetHistoricalPriceWithDiscount(ctx context.Context, variantID string, order
 		})
 	}
 
-	afterFlat := int(priceValue) - int(totalFlat)
+	afterPercentage := priceFloat * totalPercentage
+	afterFlat := afterPercentage - totalFlat
 	if afterFlat < 0 {
 		afterFlat = 0
 	}
-	afterPct := float64(afterFlat) * (1 - totalPercentage/100.0)
-	finalPrice := uint(afterPct)
+	finalPrice := uint(afterFlat)
 
-	log.Printf("[HISTORIC_PRICE] Original: %d, Flat: -%d, %%: -%.2f%% → Final: %d",
-		priceValue, totalFlat, totalPercentage, finalPrice)
+	log.Printf("[HISTORIC_PRICE] Original: %d, Final after discounts: %d (%% multiplier=%.4f, flat=%.2f)",
+		price.Price, finalPrice, totalPercentage, totalFlat)
 
+	originalPriceUint := uint(price.Price)
 	return &PriceWithDiscountResponse{
 		ProductVariantID: variantID,
-		OriginalPrice:    &priceValue,
+		OriginalPrice:    &originalPriceUint,
 		FinalPrice:       &finalPrice,
 		CreatedAt:        &price.CreatedAt,
 		Discounts:        appliedDiscounts,

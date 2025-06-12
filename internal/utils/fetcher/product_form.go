@@ -2,6 +2,7 @@ package fetcher
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"strconv"
 
@@ -18,19 +19,16 @@ func GetAllProductForms(ctx context.Context) ([]models.ProductForm, error) {
 	}
 
 	if rdb != nil {
-		data, err := rdb.HGetAll(ctx, "product_form:id").Result()
+		data, err := rdb.HGetAll(ctx, "product_form:data").Result()
 		if err == nil && len(data) > 0 {
 			var forms []models.ProductForm
-			for idStr, formStr := range data {
-				id, err := strconv.Atoi(idStr)
-				if err != nil {
-					log.Printf("[CACHE] ⚠️ Gagal parsing ID %s: %v", idStr, err)
+			for _, jsonStr := range data {
+				var form models.ProductForm
+				if err := json.Unmarshal([]byte(jsonStr), &form); err != nil {
+					log.Printf("[CACHE] ⚠️ Gagal unmarshal product form: %v", err)
 					continue
 				}
-				forms = append(forms, models.ProductForm{
-					ID:   uint(id),
-					Form: formStr,
-				})
+				forms = append(forms, form)
 			}
 			log.Printf("[CACHE] ✅ Berhasil ambil %d product form dari Redis", len(forms))
 			return forms, nil
@@ -47,9 +45,14 @@ func GetAllProductForms(ctx context.Context) ([]models.ProductForm, error) {
 	if rdb != nil {
 		entries := make(map[string]string)
 		for _, form := range forms {
-			entries[strconv.Itoa(int(form.ID))] = form.Form
+			jsonData, err := json.Marshal(form)
+			if err != nil {
+				log.Printf("[CACHE] ⚠️ Gagal marshal product form ID %d: %v", form.ID, err)
+				continue
+			}
+			entries[strconv.Itoa(int(form.ID))] = string(jsonData)
 		}
-		if err := rdb.HSet(ctx, "product_form:id", entries).Err(); err != nil {
+		if err := rdb.HSet(ctx, "product_form:data", entries).Err(); err != nil {
 			log.Println("[CACHE] ⚠️ Gagal menyimpan product form ke Redis:", err)
 		} else {
 			log.Printf("[CACHE] ✅ Product form disimpan ke Redis (%d item)", len(entries))

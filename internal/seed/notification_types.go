@@ -29,5 +29,5 @@ func SeedNotificationTypes(db *gorm.DB) {
 		}
 	}
 
-	log.Println("[SEEDER] 🔔 Notification types seeded")
+	log.Println("[SEEDER] ⚙️  Notification types seeded")
 }

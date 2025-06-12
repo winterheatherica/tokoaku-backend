@@ -9,7 +9,9 @@ func CustomerRoutes(router fiber.Router) {
 	router.Post("/cart", customer.AddToCart)
 	router.Post("/order/create", customer.CreateOrder)
 	router.Post("/purchase/:order_id", customer.PurchaseOrderDemo)
+	router.Post("/review", customer.AddReview)
 
+	router.Get("/review/check/:product_slug", customer.LetReview)
 	router.Get("/cart/grouped", customer.GetGroupedCart)
 	router.Get("/cart/fees", customer.GetSellerFee)
 	router.Get("/checkout/preview", customer.PreviewCheckout)

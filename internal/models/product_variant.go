@@ -12,5 +12,6 @@ type ProductVariant struct {
 
 	Product Product `gorm:"foreignKey:ProductID;references:ID" json:"product"`
 
-	ProductVariantPrices []ProductPrice `gorm:"foreignKey:ProductVariantID" json:"product_variant_prices"`
+	ProductVariantPrices []ProductPrice        `gorm:"foreignKey:ProductVariantID" json:"product_variant_prices"`
+	ProductVariantImages []ProductVariantImage `gorm:"foreignKey:ProductVariantID" json:"product_variant_images"`
 }

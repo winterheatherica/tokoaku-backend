@@ -52,17 +52,11 @@ func PreviewCheckout(c *fiber.Ctx) error {
 
 	sellerGrouped := make(map[string][]fiber.Map)
 	feePerSeller := make(map[string]*models.BankTransferFee)
-	pricePerVariant := make(map[string]*fetcher.PriceWithDiscountResponse)
 	sellerIDMap := make(map[string]string)
-
 	bankAccountPerSeller := make(map[string]*models.BankAccount)
 
 	for _, item := range selectedCarts {
-		variantImages, err := fetcher.GetAllVariantImages(context.Background(), item.ProductVariantID)
-		if err != nil {
-			variantImages = []models.ProductVariantImage{}
-		}
-
+		variantImages, _ := fetcher.GetAllVariantImages(context.Background(), item.ProductVariantID)
 		imageURL := item.ProductVariant.Product.ImageCoverURL
 		for _, img := range variantImages {
 			if img.IsVariantCover {
@@ -70,14 +64,12 @@ func PreviewCheckout(c *fiber.Ctx) error {
 				break
 			}
 		}
-
 		images := []string{}
 		for _, img := range variantImages {
 			images = append(images, img.ImageURL)
 		}
 
 		priceInfo, _ := fetcher.GetPriceWithDiscountForUI(context.Background(), item.ProductVariantID)
-		pricePerVariant[item.ProductVariantID] = priceInfo
 
 		sellerName := "-"
 		if item.ProductVariant.Product.Seller.Name != nil {
@@ -95,6 +87,11 @@ func PreviewCheckout(c *fiber.Ctx) error {
 			}
 		}
 
+		subtotal := uint(0)
+		if priceInfo != nil && priceInfo.FinalPrice != nil {
+			subtotal = item.Quantity * *priceInfo.FinalPrice
+		}
+
 		discounts := []fiber.Map{}
 		if priceInfo != nil {
 			for _, d := range priceInfo.Discounts {
@@ -106,11 +103,6 @@ func PreviewCheckout(c *fiber.Ctx) error {
 					"sponsor":    d.Sponsor,
 				})
 			}
-		}
-
-		subtotal := uint(0)
-		if priceInfo != nil && priceInfo.FinalPrice != nil {
-			subtotal = item.Quantity * *priceInfo.FinalPrice
 		}
 
 		cartData := fiber.Map{
@@ -133,6 +125,7 @@ func PreviewCheckout(c *fiber.Ctx) error {
 
 	var totalSubtotal uint = 0
 	var totalTransferFee uint = 0
+	const platformFeePerSeller uint = 2000
 	var response []fiber.Map
 
 	for sellerName, items := range sellerGrouped {
@@ -141,7 +134,6 @@ func PreviewCheckout(c *fiber.Ctx) error {
 		if fee != nil {
 			feeAmount = fee.Fee.Fee
 		}
-
 		sellerID := sellerIDMap[sellerName]
 
 		hasPhysical := false
@@ -190,8 +182,11 @@ func PreviewCheckout(c *fiber.Ctx) error {
 			"transfer_fee":     feeAmount,
 			"shipping_options": opts,
 			"bank_account_id":  bankAccountID,
+			"platform_fee":     platformFeePerSeller,
 		})
 	}
+
+	totalPlatformFee := uint(len(sellerGrouped)) * platformFeePerSeller
 
 	promoResponse := []fiber.Map{}
 	for _, promo := range promos {
@@ -225,7 +220,8 @@ func PreviewCheckout(c *fiber.Ctx) error {
 		"total": fiber.Map{
 			"subtotal":     totalSubtotal,
 			"transfer_fee": totalTransferFee,
-			"grand_total":  totalSubtotal + totalTransferFee,
+			"platform_fee": totalPlatformFee,
+			"grand_total":  totalSubtotal + totalTransferFee + totalPlatformFee,
 		},
 		"message": "Preview checkout berhasil",
 	})

@@ -2,6 +2,7 @@ package fetcher
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -14,22 +15,22 @@ import (
 func GetProductBySlug(ctx context.Context, slug string) (*models.Product, error) {
 	rdb, err := volatile.GetVolatileRedisClient(ctx)
 	if err != nil {
-		log.Printf("[CACHE] ❌ Gagal koneksi ke Redis: %v", err)
+		log.Printf("[CACHE] Gagal koneksi ke Redis: %v", err)
 		return nil, err
 	}
 
 	productID, err := rdb.HGet(ctx, "product_slug_map", slug).Result()
 	if err != nil || productID == "" {
-		log.Printf("[CACHE] ℹ️ Slug %s tidak ditemukan di Redis, ambil dari DB", slug)
+		log.Printf("[CACHE] Slug %s tidak ditemukan di Redis, ambil dari DB", slug)
 		return fetchProductFromDBAndCache(ctx, slug)
 	}
 
-	log.Printf("[CACHE] 🔁 Slug %s → ProductID %s ditemukan di Redis", slug, productID)
+	log.Printf("[CACHE] Slug %s → ProductID %s ditemukan di Redis", slug, productID)
 
 	metaKey := fmt.Sprintf("product:%s", productID)
 	metaData, err := rdb.HGetAll(ctx, metaKey).Result()
 	if err != nil || len(metaData) == 0 {
-		log.Printf("[CACHE] ⚠️ Metadata produk %s kosong di Redis, fallback ke DB", productID)
+		log.Printf("[CACHE] Metadata produk %s kosong di Redis, fallback ke DB", productID)
 		return fetchProductFromDBAndCache(ctx, slug)
 	}
 
@@ -46,7 +47,7 @@ func GetProductBySlug(ctx context.Context, slug string) (*models.Product, error)
 	variants, _ := getVariantsFromCache(ctx, productID)
 	product.Variants = variants
 
-	log.Printf("[CACHE] ✅ Product %s diambil dari Redis secara modular", slug)
+	log.Printf("[CACHE] Product %s diambil dari Redis secara modular", slug)
 	return product, nil
 }
 
@@ -60,14 +61,14 @@ func fetchProductFromDBAndCache(ctx context.Context, slug string) (*models.Produ
 		Preload("Variants").
 		Where("slug = ?", slug).
 		First(&product).Error; err != nil {
-		log.Printf("[DB] ❌ Gagal ambil product %s: %v", slug, err)
+		log.Printf("[DB] Gagal ambil product %s: %v", slug, err)
 		return nil, err
 	}
 
 	rdb, err := volatile.GetVolatileRedisClient(ctx)
 	if err == nil {
 		if err := rdb.HSet(ctx, "product_slug_map", slug, product.ID).Err(); err != nil {
-			log.Printf("[CACHE] ⚠️ Gagal simpan slug map: %v", err)
+			log.Printf("[CACHE] Gagal simpan slug map: %v", err)
 		}
 
 		metaKey := fmt.Sprintf("product:%s", product.ID)
@@ -88,17 +89,25 @@ func fetchProductFromDBAndCache(ctx context.Context, slug string) (*models.Produ
 		}
 
 		if err := rdb.HSet(ctx, metaKey, data).Err(); err != nil {
-			log.Printf("[CACHE] ⚠️ Gagal simpan metadata product ke Redis: %v", err)
+			log.Printf("[CACHE] Gagal simpan metadata product ke Redis: %v", err)
 		}
 
 		if err := rdb.Expire(ctx, metaKey, 1*time.Hour).Err(); err != nil {
-			log.Printf("[CACHE] ⚠️ Gagal set TTL untuk product %s: %v", product.ID, err)
+			log.Printf("[CACHE] Gagal set TTL untuk product %s: %v", product.ID, err)
 		}
 	} else {
-		log.Printf("[CACHE] ⚠️ Gagal koneksi ke Redis saat cache product %s: %v", product.ID, err)
+		log.Printf("[CACHE] Gagal koneksi ke Redis saat cache product %s: %v", product.ID, err)
 	}
 
 	cacheVariants(ctx, product.ID, product.Variants)
 
+	return &product, nil
+}
+
+func GetProductByID(ctx context.Context, id string) (*models.Product, error) {
+	var product models.Product
+	if err := database.DB.WithContext(ctx).Preload("ProductType").Preload("ProductForm").First(&product, "id = ?", id).Error; err != nil {
+		return nil, errors.New("Produk tidak ditemukan")
+	}
 	return &product, nil
 }

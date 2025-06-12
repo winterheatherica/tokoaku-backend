@@ -14,6 +14,8 @@ type ProductCard struct {
 	Slug            string `json:"slug"`
 	ImageCoverURL   string `json:"image_cover_url"`
 	ProductTypeName string `json:"product_type_name"`
+	ProductTypeID   uint   `json:"product_type_id"`
+	ProductFormID   uint   `json:"product_form_id"`
 	ProductFormName string `json:"product_form_name"`
 	VariantSlug     string `json:"variant_slug"`
 	MinPrice        *uint  `json:"min_price"`
@@ -78,11 +80,13 @@ func FetchProductCardList() ([]ProductCard, error) {
 			Slug:            product.Slug,
 			ImageCoverURL:   product.ImageCoverURL,
 			ProductTypeName: product.ProductType.Name,
+			ProductFormID:   product.ProductFormID,
 			ProductFormName: product.ProductForm.Form,
 			VariantSlug:     variantSlug,
 			MinPrice:        minPrice,
 			MaxPrice:        maxPrice,
 		})
+
 	}
 
 	return response, nil

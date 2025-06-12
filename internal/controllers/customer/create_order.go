@@ -141,7 +141,10 @@ func CreateOrder(c *fiber.Ctx) error {
 		}
 	}
 
-	const platformFee uint = 2000
+	platformFeePerSeller := uint(2000)
+	numberOfSellers := uint(len(req.OrderShippings))
+	platformFee := platformFeePerSeller * numberOfSellers
+
 	grandTotal := totalSubtotal + totalTransferFee + totalShippingFee + platformFee - promoDiscount
 
 	order := models.Order{

@@ -25,11 +25,26 @@ func SendVerificationEmail(to string, token string) error {
 	)
 
 	html := fmt.Sprintf(`
-		<h2>Verifikasi Email</h2>
-		<p>Klik tombol di bawah ini untuk memverifikasi akun kamu:</p>
-		<a href="%s" style="display:inline-block;padding:10px 20px;background:#2563eb;color:white;text-decoration:none;border-radius:6px;">Verifikasi Akun</a>
-		<p>Link ini akan kadaluarsa dalam 15 menit.</p>
-	`, link)
+	<div style="font-family:'Segoe UI',sans-serif;max-width:480px;margin:0 auto;padding:24px;background-color:#f5fffd;border:1px solid #8FCFBC;border-radius:12px;box-shadow:0 4px 12px rgba(58,175,169,0.15);color:#22372B;">
+		<h2 style="color:#3AAFA9;margin-top:0;">Halo dari %s 👋</h2>
+		<p style="font-size:1rem;line-height:1.6;">
+		Terima kasih telah mendaftar! Kami hanya butuh satu langkah lagi untuk mengaktifkan akun kamu.
+		</p>
+		<div style="text-align:center;margin:28px 0;">
+		<a href="%s" style="display:inline-block;padding:12px 24px;background-color:#3AAFA9;color:white;font-weight:600;text-decoration:none;border-radius:8px;font-size:1rem;box-shadow:0 4px 10px rgba(58,175,169,0.25);">
+			✔ Verifikasi Sekarang
+		</a>
+		</div>
+		<p style="font-size:0.95rem;color:#555;">
+		Tombol di atas akan membawa kamu ke halaman verifikasi. Link ini akan kadaluarsa dalam <strong>15 menit</strong>.
+		</p>
+		<hr style="border:none;border-top:1px solid #8FCFBC;margin:24px 0;" />
+		<p style="font-size:0.85rem;color:#888;">
+		Jika kamu tidak merasa mendaftar ke %s, kamu bisa mengabaikan email ini.
+		</p>
+		<p style="font-size:0.85rem;color:#8FCFBC;text-align:center;margin-top:32px;">✨ Buat pengalaman berbelanja jadi lebih menyenangkan bersama %s ✨</p>
+	</div>
+	`, config.App.PlatformName, link, config.App.PlatformName, config.App.PlatformName)
 
 	payload := EmailPayload{
 		From:    config.Email.Sender,

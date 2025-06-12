@@ -12,10 +12,13 @@ func SellerRoutes(router fiber.Router) {
 	router.Post("/variants/:id/images", seller.UploadProductVariantImage)
 	router.Post("/variants/:id/price", seller.SetProductVariantPrice)
 	router.Post("/variants/:id/cover", seller.SetVariantCover)
+	router.Post("/products/:id/summarize/positive", seller.CreatePositiveSummarization)
 
 	router.Get("/products", seller.GetSellerProducts)
 	router.Get("/products/:id", seller.GetSellerProductDetail)
 	router.Get("/products/:id/variants", seller.GetProductVariants)
 	router.Get("/variants/:id/images", seller.GetProductVariantImages)
 	router.Get("/variants/:id/price", seller.GetLatestProductVariantPrice)
+	router.Get("/products/:id/summarize/positive", seller.GetPositiveSummarization)
+	router.Get("/products/:id/summarize/negative", seller.GetNegativeSummarization)
 }

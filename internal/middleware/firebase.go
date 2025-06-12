@@ -54,7 +54,7 @@ func VerifyFirebaseToken() fiber.Handler {
 		}
 
 		c.Locals("uid", token.UID)
-		c.Locals("user", token)
+		// c.Locals("user", token)
 
 		return c.Next()
 	}

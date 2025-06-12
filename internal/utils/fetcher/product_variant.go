@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gofiber/fiber/v2"
 	"github.com/winterheatherica/tokoaku-backend/internal/models"
 	"github.com/winterheatherica/tokoaku-backend/internal/services/database"
 	"github.com/winterheatherica/tokoaku-backend/internal/utils/redis/volatile"
@@ -21,11 +22,11 @@ func GetProductVariantsByProductID(ctx context.Context, productID string) ([]mod
 	if err := database.DB.
 		Where("product_id = ?", productID).
 		Find(&variants).Error; err != nil {
-		log.Printf("[DB] ❌ Gagal ambil variant produk %s: %v", productID, err)
+		log.Printf("[DB] Gagal ambil variant produk %s: %v", productID, err)
 		return nil, err
 	}
 
-	log.Printf("[DB] ✅ Ambil %d variant produk %s dari DB", len(variants), productID)
+	log.Printf("[DB] Ambil %d variant produk %s dari DB", len(variants), productID)
 	cacheVariants(ctx, productID, variants)
 	return variants, nil
 }
@@ -40,11 +41,11 @@ func GetProductVariantBySlug(ctx context.Context, productID, variantSlug string)
 		WithContext(ctx).
 		Where("product_id = ? AND slug = ?", productID, variantSlug).
 		First(&variant).Error; err != nil {
-		log.Printf("[DB] ❌ Gagal ambil variant %s untuk produk %s: %v", variantSlug, productID, err)
+		log.Printf("[DB] Gagal ambil variant %s untuk produk %s: %v", variantSlug, productID, err)
 		return nil, err
 	}
 
-	log.Printf("[DB] ✅ Variant %s untuk produk %s berhasil diambil dari DB", variantSlug, productID)
+	log.Printf("[DB] Variant %s untuk produk %s berhasil diambil dari DB", variantSlug, productID)
 	CacheSingleVariant(ctx, productID, &variant)
 	return &variant, nil
 }
@@ -74,7 +75,7 @@ func getVariantsFromCache(ctx context.Context, productID string) ([]models.Produ
 		}
 	}
 
-	log.Printf("[CACHE] ✅ Ambil %d variant produk %s dari Redis", len(variants), productID)
+	log.Printf("[CACHE] Ambil %d variant produk %s dari Redis", len(variants), productID)
 	return variants, true
 }
 
@@ -99,7 +100,7 @@ func getVariantBySlugFromCache(ctx context.Context, productID, slug string) (*mo
 
 		if data["slug"] == slug {
 			if variant := parseVariantHash(data); variant != nil {
-				log.Printf("[CACHE] ✅ Variant %s untuk produk %s ditemukan di Redis", slug, productID)
+				log.Printf("[CACHE] Variant %s untuk produk %s ditemukan di Redis", slug, productID)
 				return variant, true
 			}
 		}
@@ -130,14 +131,14 @@ func cacheVariants(ctx context.Context, productID string, variants []models.Prod
 			_ = rdb.Expire(ctx, hashKey, 5*time.Minute).Err()
 			ids = append(ids, v.ID)
 		} else {
-			log.Printf("[CACHE] ❌ Gagal simpan variant %s ke Redis: %v", v.ID, err)
+			log.Printf("[CACHE] Gagal simpan variant %s ke Redis: %v", v.ID, err)
 		}
 	}
 
 	if len(ids) > 0 {
 		_ = rdb.SAdd(ctx, setKey, ids).Err()
 		_ = rdb.Expire(ctx, setKey, 5*time.Minute).Err()
-		log.Printf("[CACHE] ✅ Simpan %d variant produk %s ke Redis", len(ids), productID)
+		log.Printf("[CACHE] Simpan %d variant produk %s ke Redis", len(ids), productID)
 	}
 }
 
@@ -192,4 +193,14 @@ func InvalidateVariantCache(ctx context.Context, productID string) error {
 	}
 	key := fmt.Sprintf("product_variant:%s:ids", productID)
 	return rdb.Del(ctx, key).Err()
+}
+
+func GetProductVariantByID(ctx context.Context, productVariantID string) (*models.ProductVariant, error) {
+	var variant models.ProductVariant
+	if err := database.DB.WithContext(ctx).
+		Where("id = ?", productVariantID).
+		First(&variant).Error; err != nil {
+		return nil, fiber.NewError(fiber.StatusNotFound, "product variant not found")
+	}
+	return &variant, nil
 }

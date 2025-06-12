@@ -107,7 +107,7 @@ func GetTopDiscountsByCurrentEventLimit(ctx context.Context, variantID string) (
 	return discounts, nil
 }
 
-func GetTopDiscountsByOrderTimestamp(ctx context.Context, variantID string, ts time.Time) ([]models.Discount, error) {
+func GetTopDiscountsByOrderTimestamp(ctx context.Context, variantID string, orderTime time.Time) ([]models.Discount, error) {
 	var variant models.ProductVariant
 	if err := database.DB.WithContext(ctx).
 		Preload("Product.ProductCategories.Category").
@@ -163,7 +163,23 @@ func GetTopDiscountsByOrderTimestamp(ctx context.Context, variantID string, ts t
 	}
 
 	if len(uniqueIDs) == 0 {
+		log.Println("[FETCH] ❌ Tidak ada ID diskon ditemukan dari semua pivot")
 		return []models.Discount{}, nil
+	}
+
+	var event models.CurrentEvent
+	if err := database.DB.WithContext(ctx).
+		Preload("EventType").
+		Where("start_at <= ? AND end_at >= ?", orderTime, orderTime).
+		Order("start_at DESC").
+		First(&event).Error; err != nil {
+		log.Printf("[EVENT] ⚠️ Event tidak ditemukan pada %v: %v", orderTime, err)
+		return []models.Discount{}, nil
+	}
+
+	limit := int(event.EventType.DiscountLimit)
+	if limit <= 1 {
+		limit = 3
 	}
 
 	var discounts []models.Discount
@@ -171,12 +187,39 @@ func GetTopDiscountsByOrderTimestamp(ctx context.Context, variantID string, ts t
 		Preload("ValueType").
 		Preload("DiscountSponsor.Role").
 		Where("id IN ?", uniqueIDs).
-		Where(`start_at <= ? AND end_at >= ?`, ts, ts).
+		Where("start_at <= ? AND end_at >= ?", orderTime, orderTime).
 		Order("value_type_id ASC, value DESC").
-		Limit(3).
+		Limit(limit).
 		Find(&discounts).Error; err != nil {
 		return nil, err
 	}
 
+	totalFlat := 0
+	totalPercent := 0
+	for _, d := range discounts {
+		switch strings.ToLower(d.ValueType.Name) {
+		case "flat":
+			totalFlat++
+		case "percentage":
+			totalPercent++
+		}
+		log.Printf("  ↳ Diskon: %s (ID: %d) - Value: %d %s", d.Name, d.ID, d.Value, d.ValueType.Name)
+	}
+	log.Printf("[FETCH-HISTORIC] ✅ Ambil %d diskon (Flat %d + Percentage %d) dari event pada %v", len(discounts), totalFlat, totalPercent, orderTime)
+
 	return discounts, nil
+}
+
+func GetEventByTimestamp(ctx context.Context, t time.Time) (*models.CurrentEvent, error) {
+	var event models.CurrentEvent
+	err := database.DB.WithContext(ctx).
+		Preload("EventType").
+		Where("start_at <= ? AND end_at >= ?", t, t).
+		Order("start_at DESC").
+		First(&event).Error
+
+	if err != nil {
+		return nil, err
+	}
+	return &event, nil
 }

@@ -1,76 +1,59 @@
 package customer
 
 import (
-	"log"
-
 	"github.com/gofiber/fiber/v2"
 	"github.com/winterheatherica/tokoaku-backend/internal/models"
-	"github.com/winterheatherica/tokoaku-backend/internal/services/database"
+	"github.com/winterheatherica/tokoaku-backend/internal/utils/fetcher"
+	"github.com/winterheatherica/tokoaku-backend/internal/utils/writer"
 )
 
-type AddToCartRequest struct {
-	ProductSlug string `json:"product_slug"`
-	VariantSlug string `json:"variant_slug"`
-	Quantity    uint   `json:"quantity"`
+type AddToCartInput struct {
+	ProductVariantID string `json:"product_variant_id"`
+	Quantity         uint   `json:"quantity"`
 }
 
 func AddToCart(c *fiber.Ctx) error {
-	userUID := c.Locals("uid").(string)
+	customerID := c.Locals("uid").(string)
 
-	var req AddToCartRequest
-	if err := c.BodyParser(&req); err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "Invalid request body")
+	var input AddToCartInput
+	if err := c.BodyParser(&input); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid request body")
 	}
-	if req.Quantity == 0 {
-		return fiber.NewError(fiber.StatusBadRequest, "Quantity must be at least 1")
-	}
-
-	var product models.Product
-	if err := database.DB.Where("slug = ?", req.ProductSlug).First(&product).Error; err != nil {
-		return fiber.NewError(fiber.StatusNotFound, "Product not found")
+	if input.Quantity == 0 {
+		return fiber.NewError(fiber.StatusBadRequest, "quantity must be at least 1")
 	}
 
-	var variant models.ProductVariant
-	if err := database.DB.Where("product_id = ? AND slug = ?", product.ID, req.VariantSlug).First(&variant).Error; err != nil {
-		return fiber.NewError(fiber.StatusNotFound, "Variant not found")
+	productVariant, err := fetcher.GetProductVariantByID(c.Context(), input.ProductVariantID)
+	if err != nil {
+		return err
 	}
 
-	var existingCart models.Cart
-	err := database.DB.
-		Where("customer_id = ? AND product_variant_id = ? AND is_converted = false", userUID, variant.ID).
-		First(&existingCart).Error
-
+	existingCart, err := fetcher.GetUnconvertedCart(customerID, productVariant.ID)
 	if err == nil {
-		newQty := existingCart.Quantity + req.Quantity
-		if err := database.DB.
-			Model(&models.Cart{}).
-			Where("customer_id = ? AND product_variant_id = ? AND is_converted = false", userUID, variant.ID).
-			Update("quantity", newQty).Error; err != nil {
-			log.Println("[ERROR] Gagal update quantity:", err)
-			return fiber.NewError(fiber.StatusInternalServerError, "Gagal memperbarui keranjang")
+		updatedCart, err := writer.UpdateCartQuantity(existingCart, input.Quantity)
+		if err != nil {
+			return err
 		}
-
-		existingCart.Quantity = newQty
 		return c.JSON(fiber.Map{
-			"message": "Jumlah item diperbarui",
-			"cart":    existingCart,
+			"message": "cart quantity updated",
+			"cart":    updatedCart,
 		})
 	}
 
-	newCart := models.Cart{
-		CustomerID:       userUID,
-		ProductVariantID: variant.ID,
-		Quantity:         req.Quantity,
+	newCart := &models.Cart{
+		CustomerID:       customerID,
+		ProductVariantID: productVariant.ID,
+		Quantity:         input.Quantity,
 		IsSelected:       false,
 		IsConverted:      false,
 	}
-	if err := database.DB.Create(&newCart).Error; err != nil {
-		log.Println("[ERROR] Gagal create cart:", err)
-		return fiber.NewError(fiber.StatusInternalServerError, "Gagal menambahkan ke keranjang")
+
+	if err := writer.InsertNewCart(newCart); err != nil {
+		return err
 	}
 
 	return c.JSON(fiber.Map{
-		"message": "Item ditambahkan ke keranjang",
+		"message": "item added to cart",
 		"cart":    newCart,
 	})
 }
