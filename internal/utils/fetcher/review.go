@@ -3,6 +3,8 @@ package fetcher
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 
@@ -22,11 +24,17 @@ func AnalyzeSentiment(text string) (*uint, error) {
 	}
 	defer resp.Body.Close()
 
+	// ✅ Baca isi body mentah (debug)
+	bodyBytes, _ := ioutil.ReadAll(resp.Body)
+	bodyString := string(bodyBytes)
+	fmt.Println("🔍 Sentiment API raw response:", bodyString)
+
+	// ✅ Parse hasilnya (setelah dibaca ulang)
 	var result struct {
-		Label      string  `json:"label"`
-		Confidence float64 `json:"confidence"`
+		Label string `json:"label"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(bodyBytes, &result); err != nil {
+		fmt.Println("❌ Gagal decode response:", err)
 		return nil, fiber.NewError(fiber.StatusInternalServerError, "invalid response from sentiment API")
 	}
 
