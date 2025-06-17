@@ -94,7 +94,7 @@ func AddReview(c *fiber.Ctx) error {
 		}
 	}
 
-	if summarization.ReviewCount%3 == 0 {
+	if summarization.ReviewCount%20 == 0 {
 		fmt.Println("📈 Time to summarize after", summarization.ReviewCount, "reviews...")
 
 		var variantIDs []string
@@ -110,7 +110,7 @@ func AddReview(c *fiber.Ctx) error {
 			Where("product_variant_id IN ?", variantIDs).
 			Where("sentiment_id = ?", *sentimentID).
 			Order("created_at DESC").
-			Limit(3).
+			Limit(20).
 			Find(&reviews).Error; err != nil {
 			fmt.Println("❌ Failed to fetch reviews for summarization:", err)
 			return fiber.NewError(fiber.StatusInternalServerError, "failed to fetch recent reviews")
