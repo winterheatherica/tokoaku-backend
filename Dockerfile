@@ -9,10 +9,10 @@ COPY . .
 
 RUN go build -o app ./cmd
 
-FROM gcr.io/distroless/base-debian11
+FROM debian:bullseye-slim
 
-WORKDIR /
+WORKDIR /root/
 
-COPY --from=builder /app/app /app
+COPY --from=builder /app/app .
 
-CMD ["/app"]
+CMD ["./app"]
