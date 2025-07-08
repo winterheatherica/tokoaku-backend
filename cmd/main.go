@@ -10,9 +10,7 @@ import (
 	"github.com/winterheatherica/tokoaku-backend/config"
 	"github.com/winterheatherica/tokoaku-backend/internal/middleware"
 	"github.com/winterheatherica/tokoaku-backend/internal/routes"
-	"github.com/winterheatherica/tokoaku-backend/internal/seed"
 	"github.com/winterheatherica/tokoaku-backend/internal/services"
-	"github.com/winterheatherica/tokoaku-backend/internal/services/database"
 )
 
 func init() {
@@ -29,7 +27,7 @@ func main() {
 
 	config.LoadAll()
 	services.InitAll()
-	seed.RunAllSeeders(database.DB)
+	// seed.RunAllSeeders(database.DB)
 	// persistent.StartPersistentCacheRefresher()
 	// volatile.StartVolatileCacheRefresher()
 

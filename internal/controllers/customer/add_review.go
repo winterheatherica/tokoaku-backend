@@ -94,49 +94,105 @@ func AddReview(c *fiber.Ctx) error {
 		}
 	}
 
-	if summarization.ReviewCount%20 == 0 {
-		fmt.Println("📈 Time to summarize after", summarization.ReviewCount, "reviews...")
+	// if summarization.ReviewCount%20 == 0 {
+	// 	fmt.Println("📈 Time to summarize after", summarization.ReviewCount, "reviews...")
 
-		var variantIDs []string
-		if err := database.DB.Model(&models.ProductVariant{}).
-			Where("product_id = ?", variant.ProductID).
-			Pluck("id", &variantIDs).Error; err != nil {
-			fmt.Println("❌ Failed to get variant IDs:", err)
-			return fiber.NewError(fiber.StatusInternalServerError, "failed to get variant IDs")
-		}
+	// 	var variantIDs []string
+	// 	if err := database.DB.Model(&models.ProductVariant{}).
+	// 		Where("product_id = ?", variant.ProductID).
+	// 		Pluck("id", &variantIDs).Error; err != nil {
+	// 		fmt.Println("❌ Failed to get variant IDs:", err)
+	// 		return fiber.NewError(fiber.StatusInternalServerError, "failed to get variant IDs")
+	// 	}
 
-		var reviews []models.Review
-		if err := database.DB.
-			Where("product_variant_id IN ?", variantIDs).
-			Where("sentiment_id = ?", *sentimentID).
-			Order("created_at DESC").
-			Limit(20).
-			Find(&reviews).Error; err != nil {
-			fmt.Println("❌ Failed to fetch reviews for summarization:", err)
-			return fiber.NewError(fiber.StatusInternalServerError, "failed to fetch recent reviews")
-		}
+	// 	var reviews []models.Review
+	// 	if err := database.DB.
+	// 		Where("product_variant_id IN ?", variantIDs).
+	// 		Where("sentiment_id = ?", *sentimentID).
+	// 		Order("created_at DESC").
+	// 		Limit(20).
+	// 		Find(&reviews).Error; err != nil {
+	// 		fmt.Println("❌ Failed to fetch reviews for summarization:", err)
+	// 		return fiber.NewError(fiber.StatusInternalServerError, "failed to fetch recent reviews")
+	// 	}
 
-		var texts []string
-		for _, r := range reviews {
-			texts = append(texts, r.Text)
-		}
-		fmt.Println("📤 Sending", len(texts), "reviews to summarizer...")
+	// 	var texts []string
+	// 	for _, r := range reviews {
+	// 		texts = append(texts, r.Text)
+	// 	}
+	// 	fmt.Println("📤 Sending", len(texts), "reviews to summarizer...")
 
-		summaryText, err := callSummarizerFlask(texts)
-		if err != nil {
-			fmt.Println("❌ Failed to summarize:", err)
-			return fiber.NewError(fiber.StatusInternalServerError, "failed to generate summarization: "+err.Error())
-		}
-		fmt.Println("✅ Summary result:", summaryText)
+	// 	summaryText, err := callSummarizerFlask(texts)
+	// 	if err != nil {
+	// 		fmt.Println("❌ Failed to summarize:", err)
+	// 		return fiber.NewError(fiber.StatusInternalServerError, "failed to generate summarization: "+err.Error())
+	// 	}
+	// 	fmt.Println("✅ Summary result:", summaryText)
 
-		newDetail := models.SummarizationDetail{
-			SummarizationID: summarization.ID,
-			Text:            summaryText,
-		}
-		if err := database.DB.Create(&newDetail).Error; err != nil {
-			fmt.Println("❌ Failed to save summarization detail:", err)
-			return fiber.NewError(fiber.StatusInternalServerError, "failed to save summarization detail")
-		}
+	// 	newDetail := models.SummarizationDetail{
+	// 		SummarizationID: summarization.ID,
+	// 		Text:            summaryText,
+	// 	}
+	// 	if err := database.DB.Create(&newDetail).Error; err != nil {
+	// 		fmt.Println("❌ Failed to save summarization detail:", err)
+	// 		return fiber.NewError(fiber.StatusInternalServerError, "failed to save summarization detail")
+	// 	}
+	// }
+
+	if summarization.ReviewCount > 19 {
+		// Jalankan summarization di background
+		go func(productID string, sentimentID uint) {
+			fmt.Println("📈 Running background summarization...")
+
+			var variantIDs []string
+			if err := database.DB.Model(&models.ProductVariant{}).
+				Where("product_id = ?", productID).
+				Pluck("id", &variantIDs).Error; err != nil {
+				fmt.Println("❌ (BG) Failed to get variant IDs:", err)
+				return
+			}
+
+			var reviews []models.Review
+			if err := database.DB.
+				Where("product_variant_id IN ?", variantIDs).
+				Where("sentiment_id = ?", sentimentID).
+				Order("created_at DESC").
+				Limit(20).
+				Find(&reviews).Error; err != nil {
+				fmt.Println("❌ (BG) Failed to fetch reviews for summarization:", err)
+				return
+			}
+
+			var texts []string
+			for _, r := range reviews {
+				texts = append(texts, r.Text)
+			}
+
+			summaryText, err := callSummarizerFlask(texts)
+			if err != nil {
+				fmt.Println("❌ (BG) Failed to summarize:", err)
+				return
+			}
+
+			var summarization models.Summarization
+			if err := database.DB.
+				Where("product_id = ? AND sentiment_id = ?", productID, sentimentID).
+				First(&summarization).Error; err != nil {
+				fmt.Println("❌ (BG) Failed to find summarization again:", err)
+				return
+			}
+
+			newDetail := models.SummarizationDetail{
+				SummarizationID: summarization.ID,
+				Text:            summaryText,
+			}
+			if err := database.DB.Create(&newDetail).Error; err != nil {
+				fmt.Println("❌ (BG) Failed to save summarization detail:", err)
+				return
+			}
+
+			fmt.Println("✅ (BG) Summarization completed and saved.")
+		}(variant.ProductID, *sentimentID)
 	}
 
 	fmt.Println("📦 Fetching full review for return...")

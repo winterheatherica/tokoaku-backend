@@ -20,4 +20,10 @@ func VisitorRoutes(router fiber.Router) {
 	router.Get("/product-forms", visitor.GetProductForms)
 	router.Get("/current-event", visitor.GetDiscountLimit)
 	router.Get("/reviews/:product_slug", visitor.GetReviewsByProduct)
+	router.Get("/products/:id/summarize/positive", visitor.GetPositiveSummarization)
+	router.Get("/products/:id/summarize/negative", visitor.GetNegativeSummarization)
+	router.Get("/bank-list", visitor.GetBankList)
+	router.Get("/product-form/:slug", visitor.GetProductByFormSlug)
+	router.Get("/product-type/:slug", visitor.GetProductByTypeSlug)
+
 }

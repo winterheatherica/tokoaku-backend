@@ -78,3 +78,71 @@ func GetProductByType(c *fiber.Ctx) error {
 		"data":    response,
 	})
 }
+
+func GetProductByTypeSlug(c *fiber.Ctx) error {
+	slug := c.Params("slug")
+
+	// Ganti nama variabel dari 'type' → 'productType'
+	var productType models.ProductType
+	if err := database.DB.Where("slug = ?", slug).First(&productType).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Product type tidak ditemukan",
+		})
+	}
+
+	var products []models.Product
+	if err := database.DB.Where("product_type_id = ?", productType.ID).Preload("ProductType").Find(&products).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Gagal mengambil produk",
+		})
+	}
+
+	var response []fetcher.ProductCard
+	ctx := context.Background()
+
+	for _, product := range products {
+		var variants []models.ProductVariant
+		if err := database.DB.Where("product_id = ?", product.ID).Order("created_at ASC").Find(&variants).Error; err != nil {
+			continue
+		}
+
+		var variantSlug string
+		if len(variants) > 0 {
+			variantSlug = variants[0].Slug
+		}
+
+		var minPrice, maxPrice *uint
+		for _, v := range variants {
+			price, err := fetcher.GetPriceWithDiscountForUI(ctx, v.ID)
+			if err != nil || price == nil || price.FinalPrice == nil {
+				continue
+			}
+			final := *price.FinalPrice
+			if minPrice == nil || final < *minPrice {
+				tmp := final
+				minPrice = &tmp
+			}
+			if maxPrice == nil || final > *maxPrice {
+				tmp := final
+				maxPrice = &tmp
+			}
+		}
+
+		response = append(response, fetcher.ProductCard{
+			ID:              product.ID,
+			Name:            product.Name,
+			Slug:            product.Slug,
+			ImageCoverURL:   product.ImageCoverURL,
+			ProductTypeID:   product.ProductTypeID,
+			ProductTypeName: productType.Name,
+			VariantSlug:     variantSlug,
+			MinPrice:        minPrice,
+			MaxPrice:        maxPrice,
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Berhasil mengambil produk berdasarkan slug type",
+		"data":    response,
+	})
+}

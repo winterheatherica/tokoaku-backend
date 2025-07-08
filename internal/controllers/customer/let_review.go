@@ -64,7 +64,7 @@ func LetReview(c *fiber.Ctx) error {
 	if err := database.DB.
 		Where("id IN ?", boughtVariantIDs).
 		Where("product_id = ?", product.ID).
-		Where("id NOT IN (?)", database.DB.Table("reviews").Select("product_variant_id").Where("customer_id = ?", userUID)).
+		// Where("id NOT IN (?)", database.DB.Table("reviews").Select("product_variant_id").Where("customer_id = ?", userUID)).
 		Find(&eligibleVariants).Error; err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, "Gagal memfilter varian yang belum direview")
 	}

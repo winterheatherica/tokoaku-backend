@@ -9,6 +9,7 @@ import (
 	"github.com/winterheatherica/tokoaku-backend/internal/services/database"
 	firebaseService "github.com/winterheatherica/tokoaku-backend/internal/services/firebase"
 	"github.com/winterheatherica/tokoaku-backend/internal/utils/fetcher"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func Login(c *fiber.Ctx) error {
@@ -35,6 +36,20 @@ func Login(c *fiber.Ctx) error {
 		})
 	}
 
+	if user.PasswordHash == nil {
+		log.Println("[BACKEND] User tidak memiliki password hash")
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Akun tidak menggunakan login manual",
+		})
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(body.Password)); err != nil {
+		log.Println("[BACKEND] Password tidak cocok:", err)
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Email atau password salah",
+		})
+	}
+
 	roleName, err := fetcher.GetRoleNameByID(int(user.RoleID))
 	if err != nil {
 		log.Println("[BACKEND] Gagal ambil role:", err)
@@ -44,10 +59,7 @@ func Login(c *fiber.Ctx) error {
 	}
 
 	ctx := context.Background()
-
-	claims := map[string]interface{}{
-		"role": roleName,
-	}
+	claims := map[string]interface{}{"role": roleName}
 
 	if err := firebaseService.FirebaseAuth.SetCustomUserClaims(ctx, user.ID, claims); err != nil {
 		log.Println("[BACKEND] Gagal set custom claims:", err)
