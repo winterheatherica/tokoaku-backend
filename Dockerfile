@@ -1,4 +1,4 @@
-FROM golang:1.24.2 AS builder
+FROM golang:1.24.2-bookworm AS builder
 
 WORKDIR /app
 
@@ -9,10 +9,9 @@ COPY . .
 
 RUN go build -o app ./cmd
 
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 WORKDIR /root/
-
 COPY --from=builder /app/app .
 
 CMD ["./app"]
