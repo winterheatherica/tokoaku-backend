@@ -19,13 +19,21 @@ func AddToCart(c *fiber.Ctx) error {
 	if err := c.BodyParser(&input); err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid request body")
 	}
-	if input.Quantity == 0 {
-		return fiber.NewError(fiber.StatusBadRequest, "quantity must be at least 1")
-	}
 
 	productVariant, err := fetcher.GetProductVariantByID(c.Context(), input.ProductVariantID)
 	if err != nil {
 		return err
+	}
+
+	if productVariant.Stock == 0 {
+		return fiber.NewError(fiber.StatusBadRequest, "product is out of stock")
+	}
+
+	if input.Quantity == 0 {
+		return fiber.NewError(fiber.StatusBadRequest, "quantity must be at least 1")
+	}
+	if input.Quantity > productVariant.Stock {
+		return fiber.NewError(fiber.StatusBadRequest, "quantity exceeds available stock")
 	}
 
 	existingCart, err := fetcher.GetUnconvertedCart(customerID, productVariant.ID)
