@@ -14,6 +14,7 @@ import (
 	"github.com/winterheatherica/tokoaku-backend/internal/services/database"
 	"github.com/winterheatherica/tokoaku-backend/internal/utils/fetcher"
 	"github.com/winterheatherica/tokoaku-backend/internal/utils/writer"
+	"gorm.io/gorm"
 )
 
 func AddReview(c *fiber.Ctx) error {
@@ -87,9 +88,10 @@ func AddReview(c *fiber.Ctx) error {
 		}
 	} else {
 		fmt.Println("✏️ Updating review count...")
-		summarization.ReviewCount += 1
-		if err := database.DB.Save(&summarization).Error; err != nil {
-			fmt.Println("❌ Failed to update summarization:", err)
+		if err := database.DB.Model(&models.Summarization{}).
+			Where("id = ?", summarization.ID).
+			UpdateColumn("review_count", gorm.Expr("review_count + ?", 1)).Error; err != nil {
+			fmt.Println("❌ Failed to atomically update review count:", err)
 			return fiber.NewError(fiber.StatusInternalServerError, "failed to update summarization")
 		}
 	}
