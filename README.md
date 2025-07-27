@@ -66,28 +66,34 @@ VALUES (
 ```bash
 git clone https://github.com/winterheatherica/tokoaku-backend.git
 cd tokoaku-backend
+```
 
 2. **Copy the .env.example file and rename it:**
 
 ```bash
 cp .env.example .env
+```
 
 3. **Install dependencies**
 
 ```bash
 go mod tidy
+```
 
 4. **Run database migration**
 
 ```bash
 DB.AutoMigrate(...) // ← remove comment to enable migration
+```
 
 5. **Run seeders**
 
 ```bash
 seed.RunAllSeeders(...) // ← remove comment to seed data
+```
 
 6. **Start the server**
 
 ```bash
 go run ./cmd
+``` 
