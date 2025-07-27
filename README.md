@@ -56,7 +56,7 @@ VALUES (
     true,
     now()
 );
-
+``` 
 ---
 
 ## 🚀 Running the Project
