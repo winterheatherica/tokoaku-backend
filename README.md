@@ -32,7 +32,7 @@ Tokoaku Backend is the REST API service powering the Tokoaku e-commerce platform
 
 ## 📁 Environment Variables
 
-Rename `.env.example` to `.env` and fill in the following values
+Rename the .env.example file to .env, then manually fill in all the required values.
 
 ---
 
